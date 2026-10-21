@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Music.Audio;
@@ -48,6 +49,13 @@ public partial class MainWindow : Window
         DrawGauge();
 
         listener.PitchUpdated += reading => Dispatcher.BeginInvoke(() => OnPitch(reading));
+
+        foreach (var item in GuitarTuning.All)
+        {
+            var menuItem = new MenuItem { Header = item.DisplayName, Tag = item };
+            menuItem.Click += (_, _) => TuningBox.SelectedItem = item;
+            TuningMenu.Items.Add(menuItem);
+        }
 
         TuningBox.ItemsSource = GuitarTuning.All;
         TuningBox.SelectedIndex = 0;
@@ -249,6 +257,9 @@ public partial class MainWindow : Window
             return;
 
         tuning = selected;
+        foreach (MenuItem item in TuningMenu.Items)
+            item.IsChecked = item.Tag == selected;
+
         BuildStringButtons();
         ShowIdle();
     }
@@ -294,6 +305,8 @@ public partial class MainWindow : Window
         a4 = Math.Clamp(value, 415, 466);
         A4Text.Text = $"A4 = {a4:0} Hz";
     }
+
+    private void Quit_Executed(object sender, ExecutedRoutedEventArgs e) => Close();
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
