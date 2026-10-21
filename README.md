@@ -56,6 +56,8 @@ You can also open `Music.slnx` in Visual Studio and press **F5**.
 
 ## Project structure
 
+> 📖 For a detailed map of the code (every class, what it does, and where to change things), see the **[code guide](docs/code/README.md)**.
+
 ```
 Music/
 ├── App.xaml                  # Application entry point
