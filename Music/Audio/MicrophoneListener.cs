@@ -4,6 +4,12 @@ namespace Music.Audio;
 
 public readonly record struct PitchReading(double? Frequency, double Level, double Gate);
 
+/// <summary>Newly captured samples plus the input level and current noise gate.</summary>
+public readonly record struct AudioBlock(float[] Samples, double Level, double Gate)
+{
+    public bool HasSignal => Level >= Gate;
+}
+
 /// <summary>Captures microphone audio and reports the detected pitch for each buffer.</summary>
 public sealed class MicrophoneListener : IDisposable
 {
@@ -16,8 +22,11 @@ public sealed class MicrophoneListener : IDisposable
     private WaveInEvent? waveIn;
     private double noiseFloor = 0.002;
 
-    /// <summary>Raised on the audio thread.</summary>
+    /// <summary>Raised on the audio thread. Pitch detection only runs while this has subscribers.</summary>
     public event Action<PitchReading>? PitchUpdated;
+
+    /// <summary>Raised on the audio thread with each new block of samples.</summary>
+    public event Action<AudioBlock>? SamplesCaptured;
 
     /// <summary>How far above the background noise level a sound must be to be analysed.</summary>
     public double GateRatio { get; set; } = 4;
@@ -78,7 +87,12 @@ public sealed class MicrophoneListener : IDisposable
         noiseFloor = Math.Max(0.0005, noiseFloor + rate * (level - noiseFloor));
 
         double gate = Math.Max(MinimumGate, noiseFloor * GateRatio);
-        double? frequency = level >= gate ? detector.Detect(window) : null;
-        PitchUpdated?.Invoke(new PitchReading(frequency, level, gate));
+        SamplesCaptured?.Invoke(new AudioBlock(window[^count..], level, gate));
+
+        if (PitchUpdated is { } pitchUpdated)
+        {
+            double? frequency = level >= gate ? detector.Detect(window) : null;
+            pitchUpdated(new PitchReading(frequency, level, gate));
+        }
     }
 }
