@@ -64,6 +64,8 @@ public partial class MainWindow : Window
         DeviceBox.ItemsSource = devices;
         if (devices.Count > 0)
             DeviceBox.SelectedIndex = 0;
+
+        InitializeMetronome();
     }
 
     private void OnPitch(PitchReading reading)
@@ -345,7 +347,9 @@ public partial class MainWindow : Window
     {
         listener.Stop();
         tonePlayer.Stop();
+        StopMetronome();
         TunerView.Visibility = Visibility.Collapsed;
+        MetronomeView.Visibility = Visibility.Collapsed;
         StartMenu.Visibility = Visibility.Visible;
     }
 
@@ -355,6 +359,7 @@ public partial class MainWindow : Window
     {
         listener.Dispose();
         tonePlayer.Dispose();
+        metronome.Dispose();
     }
 
     private static Brush Freeze(Brush brush)

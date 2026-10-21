@@ -107,6 +107,8 @@
             <TextBlock Text="Choose an option" FontSize="15" Foreground="#9AA0B4" HorizontalAlignment="Center"
                        Margin="0,4,0,40" />
             <Button Content="Tuning" Style="{StaticResource MenuButton}" Background="#5B8CFF" Click="StartTuning_Click" />
+            <Button Content="Metronome" Style="{StaticResource MenuButton}" Background="#8B5CF6" Margin="0,14,0,0"
+                    Click="StartMetronome_Click" />
             <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
                     Command="ApplicationCommands.Close" />
         </StackPanel>
@@ -205,6 +207,51 @@
                                  ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
                 </DockPanel>
             </Grid>
+        </DockPanel>
+
+        <!-- Metronome -->
+        <DockPanel x:Name="MetronomeView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+                <TextBlock x:Name="TempoNameText" Text="Allegro" FontSize="18" Foreground="#9AA0B4"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="BpmText" Text="120" FontSize="110" FontWeight="Bold" HorizontalAlignment="Center"
+                           Margin="0,-6,0,-12" />
+                <TextBlock Text="BPM" FontSize="16" Foreground="#6C7389" HorizontalAlignment="Center" />
+
+                <DockPanel Margin="0,24,0,0">
+                    <Button DockPanel.Dock="Left" Content="−" Style="{StaticResource SmallButton}" Width="40" Height="40"
+                            FontSize="22" Click="BpmDown_Click" />
+                    <Button DockPanel.Dock="Right" Content="+" Style="{StaticResource SmallButton}" Width="40" Height="40"
+                            FontSize="22" Click="BpmUp_Click" />
+                    <Slider x:Name="BpmSlider" Minimum="30" Maximum="250" Value="120" Margin="12,0"
+                            VerticalAlignment="Center" IsSnapToTickEnabled="True" TickFrequency="1"
+                            ValueChanged="BpmSlider_ValueChanged" />
+                </DockPanel>
+
+                <StackPanel x:Name="BeatsPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,36,0,0" />
+
+                <Grid Margin="0,36,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Time signature" Foreground="#9AA0B4" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <ComboBox x:Name="TimeSignatureBox" Grid.Column="1" Width="80" Height="28" HorizontalAlignment="Left"
+                              DisplayMemberPath="Name" SelectionChanged="TimeSignatureBox_SelectionChanged" />
+                    <Button Grid.Column="2" Content="Tap tempo" Style="{StaticResource SmallButton}" Width="110"
+                            Height="34" FontSize="14" Click="TapTempo_Click"
+                            ToolTip="Tap in time with the music to set the tempo" />
+                </Grid>
+
+                <Button x:Name="StartStopButton" Content="Start" Style="{StaticResource MenuButton}" Background="#8B5CF6"
+                        Margin="0,36,0,0" Click="StartStop_Click" />
+            </StackPanel>
         </DockPanel>
     </Grid>
 </Window>
