@@ -2,21 +2,25 @@ using NAudio.Wave;
 
 namespace Music.Audio;
 
-public readonly record struct PitchReading(double? Frequency, double Level);
+public readonly record struct PitchReading(double? Frequency, double Level, double Gate);
 
 /// <summary>Captures microphone audio and reports the detected pitch for each buffer.</summary>
 public sealed class MicrophoneListener : IDisposable
 {
     public const int SampleRate = 44100;
     private const int WindowSize = 4096;
-    private const double SilenceLevel = 0.008;
+    private const double MinimumGate = 0.003;
 
     private readonly float[] window = new float[WindowSize];
     private readonly PitchDetector detector = new(SampleRate, WindowSize);
     private WaveInEvent? waveIn;
+    private double noiseFloor = 0.002;
 
     /// <summary>Raised on the audio thread.</summary>
     public event Action<PitchReading>? PitchUpdated;
+
+    /// <summary>How far above the background noise level a sound must be to be analysed.</summary>
+    public double GateRatio { get; set; } = 4;
 
     public static IReadOnlyList<string> GetDevices() =>
         Enumerable.Range(0, WaveInEvent.DeviceCount)
@@ -27,6 +31,7 @@ public sealed class MicrophoneListener : IDisposable
     {
         Stop();
         Array.Clear(window);
+        noiseFloor = 0.002;
 
         waveIn = new WaveInEvent
         {
@@ -67,7 +72,13 @@ public sealed class MicrophoneListener : IDisposable
             sumSquares += window[i] * window[i];
         double level = Math.Sqrt(sumSquares / Math.Max(1, count));
 
-        double? frequency = level >= SilenceLevel ? detector.Detect(window) : null;
-        PitchUpdated?.Invoke(new PitchReading(frequency, level));
+        // Track the room's background level: drop quickly to quiet moments, rise only slowly,
+        // so a ringing string doesn't get mistaken for noise.
+        double rate = level < noiseFloor ? 0.3 : 0.003;
+        noiseFloor = Math.Max(0.0005, noiseFloor + rate * (level - noiseFloor));
+
+        double gate = Math.Max(MinimumGate, noiseFloor * GateRatio);
+        double? frequency = level >= gate ? detector.Detect(window) : null;
+        PitchUpdated?.Invoke(new PitchReading(frequency, level, gate));
     }
 }

@@ -6,14 +6,15 @@ namespace Music.Audio;
 /// </summary>
 public sealed class PitchDetector
 {
-    private const double Threshold = 0.15;
+    // Lower = stricter: only clearly periodic sounds (like a plucked string) pass.
+    private const double Threshold = 0.1;
 
     private readonly int sampleRate;
     private readonly int tauMin;
     private readonly int tauMax;
     private readonly float[] yin;
 
-    public PitchDetector(int sampleRate, int bufferSize, double minFrequency = 50, double maxFrequency = 1400)
+    public PitchDetector(int sampleRate, int bufferSize, double minFrequency = 50, double maxFrequency = 1000)
     {
         this.sampleRate = sampleRate;
         tauMin = Math.Max(2, (int)(sampleRate / maxFrequency));

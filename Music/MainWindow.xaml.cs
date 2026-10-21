@@ -17,12 +17,18 @@ public partial class MainWindow : Window
     private static readonly TimeSpan HoldTime = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan NewNoteGap = TimeSpan.FromSeconds(0.25);
 
+    // A pitch must hold steady (within StableCents) for this many readings (~50 ms each) before it is shown.
+    private const int StableReadingsRequired = 3;
+    private const double StableCents = 40;
+
     private static readonly Brush NeutralBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xE8, 0xEF)));
     private static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xA0, 0xB4)));
     private static readonly Brush InTuneBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x3D, 0xDC, 0x84)));
     private static readonly Brush OffBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x43)));
     private static readonly Brush StringBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x2C, 0x31, 0x40)));
     private static readonly Brush ActiveStringBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x5B, 0x8C, 0xFF)));
+    private static readonly Brush LevelGatedBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x4A, 0x50, 0x66)));
+
     private readonly MicrophoneListener listener = new();
     private readonly TonePlayer tonePlayer = new();
     private readonly List<double> recentFrequencies = [];
@@ -33,6 +39,8 @@ public partial class MainWindow : Window
     private int? manualString;
     private double needleCents;
     private DateTime lastPitchTime = DateTime.MinValue;
+    private double? lastRawFrequency;
+    private int stableReadings;
 
     public MainWindow()
     {
@@ -55,9 +63,10 @@ public partial class MainWindow : Window
     private void OnPitch(PitchReading reading)
     {
         LevelBar.Value = Math.Min(1, Math.Sqrt(reading.Level) * 3);
+        LevelBar.Foreground = reading.Level >= reading.Gate ? ActiveStringBrush : LevelGatedBrush;
 
         DateTime now = DateTime.UtcNow;
-        if (reading.Frequency is not double frequency)
+        if (!IsStable(reading.Frequency) || reading.Frequency is not double frequency)
         {
             if (now - lastPitchTime > NewNoteGap)
                 recentFrequencies.Clear();
@@ -90,6 +99,19 @@ public partial class MainWindow : Window
 
         MoveNeedle(Math.Clamp(cents, -GaugeRangeCents, GaugeRangeCents));
         HighlightString(stringIndex);
+    }
+
+    /// <summary>Background noise jumps around; a ringing string holds its pitch.</summary>
+    private bool IsStable(double? frequency)
+    {
+        if (frequency is double f && lastRawFrequency is double previous
+            && Math.Abs(NoteMath.Cents(f, previous)) <= StableCents)
+            stableReadings++;
+        else
+            stableReadings = frequency is null ? 0 : 1;
+
+        lastRawFrequency = frequency;
+        return stableReadings >= StableReadingsRequired;
     }
 
     private void ShowIdle()
@@ -255,6 +277,12 @@ public partial class MainWindow : Window
             manualString = null;
             HighlightString(-1);
         }
+    }
+
+    private void SensitivitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        // 0 → sound must be ~16x louder than the background, 1 → no extra margin.
+        listener.GateRatio = Math.Pow(10, (1 - e.NewValue) * 1.2);
     }
 
     private void A4Down_Click(object sender, RoutedEventArgs e) => SetA4(a4 - 1);

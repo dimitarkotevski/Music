@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Guitar Tuner"
-        Width="560" Height="680"
+        Width="560" Height="720"
         ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#15171E"
@@ -84,6 +84,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
@@ -103,6 +104,17 @@
                 <CheckBox x:Name="AutoBox" DockPanel.Dock="Right" Content="Auto-detect string" IsChecked="True"
                           Foreground="#E6E8EF" VerticalAlignment="Center"
                           Checked="AutoBox_Changed" Unchecked="AutoBox_Changed" />
+            </DockPanel>
+
+            <TextBlock Grid.Row="3" Text="Sensitivity" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+            <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
+                <TextBlock DockPanel.Dock="Left" Text="Ignore noise" FontSize="11" Foreground="#6C7389"
+                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock DockPanel.Dock="Right" Text="Pick up quiet" FontSize="11" Foreground="#6C7389"
+                           VerticalAlignment="Center" Margin="8,0,0,0" />
+                <Slider x:Name="SensitivitySlider" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center"
+                        ToolTip="Lower this if background noise is being detected"
+                        ValueChanged="SensitivitySlider_ValueChanged" />
             </DockPanel>
         </Grid>
 
@@ -134,8 +146,9 @@
         <!-- Input level -->
         <DockPanel Grid.Row="5" Margin="0,20,0,0">
             <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
-            <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#5B8CFF"
-                         BorderThickness="0" />
+            <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                         BorderThickness="0"
+                         ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
         </DockPanel>
     </Grid>
 </Window>
