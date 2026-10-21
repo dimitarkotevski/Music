@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     private const int StableReadingsRequired = 3;
     private const double StableCents = 40;
 
+    // In auto mode a note keeps its string unless another string is heard for this many readings in a row.
+    private const int StringSwitchReadings = 5;
+
     private static readonly Brush NeutralBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xE8, 0xEF)));
     private static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xA0, 0xB4)));
     private static readonly Brush InTuneBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x3D, 0xDC, 0x84)));
@@ -44,6 +47,8 @@ public partial class MainWindow : Window
     private DateTime lastPitchTime = DateTime.MinValue;
     private double? lastRawFrequency;
     private int stableReadings;
+    private int? autoString;
+    private int stringSwitchVotes;
 
     public MainWindow()
     {
@@ -70,7 +75,10 @@ public partial class MainWindow : Window
         if (!IsStable(reading.Frequency) || reading.Frequency is not double frequency)
         {
             if (now - lastPitchTime > NewNoteGap)
+            {
                 recentFrequencies.Clear();
+                autoString = null;
+            }
             if (now - lastPitchTime > HoldTime)
                 ShowIdle();
             return;
@@ -82,7 +90,7 @@ public partial class MainWindow : Window
             recentFrequencies.RemoveAt(0);
         double smoothed = Median(recentFrequencies);
 
-        int stringIndex = manualString ?? NearestString(smoothed);
+        int stringIndex = manualString ?? AutoDetectString(smoothed);
         int targetMidi = tuning.Strings[stringIndex];
         double cents = NoteMath.Cents(smoothed, NoteMath.MidiToFrequency(targetMidi, a4));
 
@@ -132,6 +140,24 @@ public partial class MainWindow : Window
     {
         needleCents += 0.35 * (targetCents - needleCents);
         NeedleRotate.Angle = needleCents / GaugeRangeCents * GaugeSweepDegrees;
+    }
+
+    /// <summary>Picks the nearest string, but sticks with it for the rest of the note to avoid flickering.</summary>
+    private int AutoDetectString(double frequency)
+    {
+        int nearest = NearestString(frequency);
+        if (autoString is null || nearest == autoString)
+        {
+            autoString = nearest;
+            stringSwitchVotes = 0;
+        }
+        else if (++stringSwitchVotes >= StringSwitchReadings)
+        {
+            autoString = nearest;
+            stringSwitchVotes = 0;
+        }
+
+        return autoString.Value;
     }
 
     private int NearestString(double frequency)
@@ -250,6 +276,7 @@ public partial class MainWindow : Window
             return;
 
         tuning = selected;
+        autoString = null;
         BuildStringButtons();
         ShowIdle();
     }
