@@ -9,6 +9,11 @@ public sealed class PitchDetector
     // Lower = stricter: only clearly periodic sounds (like a plucked string) pass.
     private const double Threshold = 0.1;
 
+    // Octave correction only kicks in when the chosen dip is not already clean, and a
+    // longer period is clearly (OctaveCheckRatio times) more periodic.
+    private const double OctaveCheckFloor = 0.02;
+    private const double OctaveCheckRatio = 0.5;
+
     private readonly int sampleRate;
     private readonly int tauMin;
     private readonly int tauMax;
@@ -59,11 +64,42 @@ public sealed class PitchDetector
         if (best < 0)
             return null;
 
+        best = CorrectOctaveError(best);
+
         // Parabolic interpolation for sub-sample accuracy.
         double s0 = yin[best - 1], s1 = yin[best], s2 = yin[best + 1];
         double denominator = s0 + s2 - 2 * s1;
         double refinedTau = denominator == 0 ? best : best + (s0 - s2) / (2 * denominator);
 
         return sampleRate / refinedTau;
+    }
+
+    /// <summary>
+    /// A strong 2nd or 3rd harmonic (common on low strings) can make a fraction of the real
+    /// period look periodic enough to pass the threshold, reading the note an octave too high.
+    /// If a multiple of the chosen period is much more periodic, the real note is lower.
+    /// </summary>
+    private int CorrectOctaveError(int tau)
+    {
+        int result = tau;
+        for (int multiple = 2; multiple <= 3; multiple++)
+        {
+            int center = tau * multiple;
+            int spread = Math.Max(2, center / 33);
+            if (center - spread < 1 || center + spread >= tauMax)
+                break;
+
+            int candidate = center - spread;
+            for (int i = candidate + 1; i <= center + spread; i++)
+            {
+                if (yin[i] < yin[candidate])
+                    candidate = i;
+            }
+
+            if (yin[result] > OctaveCheckFloor && yin[candidate] < yin[result] * OctaveCheckRatio)
+                result = candidate;
+        }
+
+        return result;
     }
 }
