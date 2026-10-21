@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Music"
+        xmlns:controls="clr-namespace:Music.Controls"
         Title="Guitar Tuner"
         Width="560" Height="765"
         ResizeMode="CanMinimize"
@@ -107,6 +108,8 @@
             <TextBlock Text="Choose an option" FontSize="15" Foreground="#9AA0B4" HorizontalAlignment="Center"
                        Margin="0,4,0,40" />
             <Button Content="Tuning" Style="{StaticResource MenuButton}" Background="#5B8CFF" Click="StartTuning_Click" />
+            <Button Content="Chords" Style="{StaticResource MenuButton}" Background="#14B8A6" Margin="0,14,0,0"
+                    Click="StartChords_Click" />
             <Button Content="Metronome" Style="{StaticResource MenuButton}" Background="#8B5CF6" Margin="0,14,0,0"
                     Click="StartMetronome_Click" />
             <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
@@ -205,6 +208,69 @@
                     <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
                                  BorderThickness="0"
                                  ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- Chord recognition -->
+        <DockPanel x:Name="ChordView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0">
+                    <TextBlock Text="Microphone" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="ChordDeviceBox" Height="28" SelectionChanged="ChordDeviceBox_SelectionChanged" />
+                </DockPanel>
+
+                <Grid Grid.Row="1" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Shrinks long names like C#maj7/G# to fit next to the diagram -->
+                        <Viewbox MaxWidth="290" Height="130" StretchDirection="DownOnly">
+                            <TextBlock x:Name="ChordNameText" Text="–" FontSize="110" FontWeight="Bold" />
+                        </Viewbox>
+                        <TextBlock x:Name="ChordFullNameText" Text="Strum a chord" FontSize="20" FontWeight="SemiBold"
+                                   Foreground="#9AA0B4" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                        <TextBlock x:Name="ChordNotesText" Text=" " FontSize="16" Foreground="#9AA0B4"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
+                        <TextBlock x:Name="ChordMatchText" Text=" " FontSize="13" Foreground="#6C7389"
+                                   HorizontalAlignment="Center" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <controls:ChordDiagram x:Name="ChordDiagramView" Grid.Column="1" Width="180" Height="230"
+                                           Margin="12,0,0,0" DotBrush="#14B8A6" Visibility="Hidden"
+                                           ToolTip="How to play this chord: numbers are fingers (1 = index), ○ = open, × = don't play" />
+                </Grid>
+
+                <!-- Energy per note (chromagram); bars are created in code -->
+                <Grid x:Name="ChromaGrid" Grid.Row="2" Height="150" Margin="0,8,0,0"
+                      ToolTip="How strongly each note is heard. Notes of the detected chord are highlighted." />
+
+                <DockPanel Grid.Row="3" Margin="0,18,0,0">
+                    <TextBlock Text="Recent" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <StackPanel x:Name="RecentChordsPanel" Orientation="Horizontal" Height="30" />
+                </DockPanel>
+
+                <DockPanel Grid.Row="4" Margin="0,18,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="ChordLevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, teal = loud enough to be analysed" />
                 </DockPanel>
             </Grid>
         </DockPanel>

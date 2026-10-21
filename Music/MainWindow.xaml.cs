@@ -66,6 +66,7 @@ public partial class MainWindow : Window
             DeviceBox.SelectedIndex = 0;
 
         InitializeMetronome();
+        InitializeChords();
     }
 
     private void OnPitch(PitchReading reading)
@@ -285,6 +286,10 @@ public partial class MainWindow : Window
 
     private void DeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // Keep the microphone choice shared with the chords screen.
+        if (ChordDeviceBox.ItemsSource is not null && ChordDeviceBox.SelectedIndex != DeviceBox.SelectedIndex)
+            ChordDeviceBox.SelectedIndex = DeviceBox.SelectedIndex;
+
         // The microphone only runs while the tuner screen is open.
         if (TunerView.Visibility == Visibility.Visible)
             StartListening();
@@ -346,9 +351,11 @@ public partial class MainWindow : Window
     private void BackToMenu_Click(object sender, RoutedEventArgs e)
     {
         listener.Stop();
+        chordListener.Stop();
         tonePlayer.Stop();
         StopMetronome();
         TunerView.Visibility = Visibility.Collapsed;
+        ChordView.Visibility = Visibility.Collapsed;
         MetronomeView.Visibility = Visibility.Collapsed;
         StartMenu.Visibility = Visibility.Visible;
     }
@@ -358,6 +365,7 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
         listener.Dispose();
+        chordListener.Dispose();
         tonePlayer.Dispose();
         metronome.Dispose();
     }
