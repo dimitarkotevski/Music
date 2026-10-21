@@ -1,8 +1,9 @@
 <Window x:Class="Music.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Music"
         Title="Guitar Tuner"
-        Width="560" Height="745"
+        Width="560" Height="765"
         ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#15171E"
@@ -12,10 +13,12 @@
 
     <Window.CommandBindings>
         <CommandBinding Command="ApplicationCommands.Close" Executed="Quit_Executed" />
+        <CommandBinding Command="{x:Static local:MainWindow.BackToMenuCommand}" Executed="BackToMenu_Click" />
     </Window.CommandBindings>
 
     <Window.InputBindings>
         <KeyBinding Key="Q" Modifiers="Control" Command="ApplicationCommands.Close" />
+        <KeyBinding Key="Escape" Command="{x:Static local:MainWindow.BackToMenuCommand}" />
     </Window.InputBindings>
 
     <Window.Resources>
@@ -70,106 +73,138 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="MenuButton" TargetType="Button">
+            <Setter Property="Width" Value="260" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C3140" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="12" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <DockPanel>
-        <Menu DockPanel.Dock="Top" Background="#232733" Foreground="#E6E8EF" Padding="4,2">
-            <Menu.Resources>
-                <!-- Drop-down items render on a light popup, so give them dark text. -->
-                <Style x:Key="SubMenuItem" TargetType="MenuItem">
-                    <Setter Property="Foreground" Value="#1E1E1E" />
-                </Style>
-            </Menu.Resources>
-            <MenuItem x:Name="TuningMenu" Header="_Tuning" ItemContainerStyle="{StaticResource SubMenuItem}" />
-            <MenuItem Header="_Quit" Command="ApplicationCommands.Close" ToolTip="Quit (Ctrl+Q)" />
-        </Menu>
+    <Grid>
+        <!-- Start menu -->
+        <StackPanel x:Name="StartMenu" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="🎸" FontSize="64" HorizontalAlignment="Center" FontFamily="Segoe UI Emoji" />
+            <TextBlock Text="Guitar Tuner" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0" />
+            <TextBlock Text="Choose an option" FontSize="15" Foreground="#9AA0B4" HorizontalAlignment="Center"
+                       Margin="0,4,0,40" />
+            <Button Content="Tuning" Style="{StaticResource MenuButton}" Background="#5B8CFF" Click="StartTuning_Click" />
+            <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
+                    Command="ApplicationCommands.Close" />
+        </StackPanel>
 
-        <Grid Margin="24,20">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <!-- Tuner -->
+        <DockPanel x:Name="TunerView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
 
-            <!-- Settings -->
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <Grid Margin="24,20">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
-                <ComboBox x:Name="TuningBox" Grid.Row="0" Grid.Column="1" Height="28"
-                          DisplayMemberPath="DisplayName" SelectionChanged="TuningBox_SelectionChanged" />
+                <!-- Settings -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="1" Text="Microphone" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
-                <ComboBox x:Name="DeviceBox" Grid.Row="1" Grid.Column="1" Height="28" Margin="0,8,0,0"
-                          SelectionChanged="DeviceBox_SelectionChanged" />
+                    <TextBlock Grid.Row="0" Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TuningBox" Grid.Row="0" Grid.Column="1" Height="28"
+                              DisplayMemberPath="DisplayName" SelectionChanged="TuningBox_SelectionChanged" />
 
-                <TextBlock Grid.Row="2" Text="Reference" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
-                <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" LastChildFill="False">
-                    <Button Content="−" Style="{StaticResource SmallButton}" Click="A4Down_Click" />
-                    <TextBlock x:Name="A4Text" Text="A4 = 440 Hz" Width="100" TextAlignment="Center"
-                               VerticalAlignment="Center" FontWeight="SemiBold" />
-                    <Button Content="+" Style="{StaticResource SmallButton}" Click="A4Up_Click" />
-                    <CheckBox x:Name="AutoBox" DockPanel.Dock="Right" Content="Auto-detect string" IsChecked="True"
-                              Foreground="#E6E8EF" VerticalAlignment="Center"
-                              Checked="AutoBox_Changed" Unchecked="AutoBox_Changed" />
-                </DockPanel>
+                    <TextBlock Grid.Row="1" Text="Microphone" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="DeviceBox" Grid.Row="1" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="DeviceBox_SelectionChanged" />
 
-                <TextBlock Grid.Row="3" Text="Sensitivity" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
-                <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
-                    <TextBlock DockPanel.Dock="Left" Text="Ignore noise" FontSize="11" Foreground="#6C7389"
-                               VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <TextBlock DockPanel.Dock="Right" Text="Pick up quiet" FontSize="11" Foreground="#6C7389"
-                               VerticalAlignment="Center" Margin="8,0,0,0" />
-                    <Slider x:Name="SensitivitySlider" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center"
-                            ToolTip="Lower this if background noise is being detected"
-                            ValueChanged="SensitivitySlider_ValueChanged" />
+                    <TextBlock Grid.Row="2" Text="Reference" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" LastChildFill="False">
+                        <Button Content="−" Style="{StaticResource SmallButton}" Click="A4Down_Click" />
+                        <TextBlock x:Name="A4Text" Text="A4 = 440 Hz" Width="100" TextAlignment="Center"
+                                   VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Content="+" Style="{StaticResource SmallButton}" Click="A4Up_Click" />
+                        <CheckBox x:Name="AutoBox" DockPanel.Dock="Right" Content="Auto-detect string" IsChecked="True"
+                                  Foreground="#E6E8EF" VerticalAlignment="Center"
+                                  Checked="AutoBox_Changed" Unchecked="AutoBox_Changed" />
+                    </DockPanel>
+
+                    <TextBlock Grid.Row="3" Text="Sensitivity" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="Ignore noise" FontSize="11" Foreground="#6C7389"
+                                   VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock DockPanel.Dock="Right" Text="Pick up quiet" FontSize="11" Foreground="#6C7389"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                        <Slider x:Name="SensitivitySlider" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center"
+                                ToolTip="Lower this if background noise is being detected"
+                                ValueChanged="SensitivitySlider_ValueChanged" />
+                    </DockPanel>
+                </Grid>
+
+                <!-- Gauge -->
+                <Canvas x:Name="GaugeCanvas" Grid.Row="1" Width="320" Height="180" Margin="0,24,0,0">
+                    <Line x:Name="Needle" X1="160" Y1="170" X2="160" Y2="40"
+                          Stroke="#E6E8EF" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                        <Line.RenderTransform>
+                            <RotateTransform x:Name="NeedleRotate" CenterX="160" CenterY="170" />
+                        </Line.RenderTransform>
+                    </Line>
+                    <Ellipse Canvas.Left="152" Canvas.Top="162" Width="16" Height="16" Fill="#E6E8EF" />
+                </Canvas>
+
+                <!-- Readout -->
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <TextBlock x:Name="NoteText" Text="–" FontSize="72" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="HintText" Text="Play a string" FontSize="20" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="#9AA0B4" />
+                    <TextBlock x:Name="CentsText" Text=" " FontSize="15" HorizontalAlignment="Center"
+                               Foreground="#9AA0B4" Margin="0,6,0,0" />
+                    <TextBlock x:Name="FrequencyText" Text=" " FontSize="13" HorizontalAlignment="Center"
+                               Foreground="#6C7389" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <!-- Strings -->
+                <StackPanel x:Name="StringsPanel" Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" />
+
+                <!-- Input level -->
+                <DockPanel Grid.Row="5" Margin="0,20,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
                 </DockPanel>
             </Grid>
-
-            <!-- Gauge -->
-            <Canvas x:Name="GaugeCanvas" Grid.Row="1" Width="320" Height="180" Margin="0,24,0,0">
-                <Line x:Name="Needle" X1="160" Y1="170" X2="160" Y2="40"
-                      Stroke="#E6E8EF" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
-                    <Line.RenderTransform>
-                        <RotateTransform x:Name="NeedleRotate" CenterX="160" CenterY="170" />
-                    </Line.RenderTransform>
-                </Line>
-                <Ellipse Canvas.Left="152" Canvas.Top="162" Width="16" Height="16" Fill="#E6E8EF" />
-            </Canvas>
-
-            <!-- Readout -->
-            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,8,0,0">
-                <TextBlock x:Name="NoteText" Text="–" FontSize="72" FontWeight="Bold" HorizontalAlignment="Center" />
-                <TextBlock x:Name="HintText" Text="Play a string" FontSize="20" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" Foreground="#9AA0B4" />
-                <TextBlock x:Name="CentsText" Text=" " FontSize="15" HorizontalAlignment="Center"
-                           Foreground="#9AA0B4" Margin="0,6,0,0" />
-                <TextBlock x:Name="FrequencyText" Text=" " FontSize="13" HorizontalAlignment="Center"
-                           Foreground="#6C7389" Margin="0,2,0,0" />
-            </StackPanel>
-
-            <!-- Strings -->
-            <StackPanel x:Name="StringsPanel" Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" />
-
-            <!-- Input level -->
-            <DockPanel Grid.Row="5" Margin="0,20,0,0">
-                <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
-                <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
-                             BorderThickness="0"
-                             ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
-            </DockPanel>
-        </Grid>
-    </DockPanel>
+        </DockPanel>
+    </Grid>
 </Window>

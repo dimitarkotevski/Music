@@ -15,6 +15,8 @@ public partial class MainWindow : Window
     private const double GaugeRangeCents = 50;
     private const double GaugeSweepDegrees = 60;
     private const double GaugeCenterX = 160, GaugeCenterY = 170, GaugeRadius = 140;
+    public static readonly RoutedCommand BackToMenuCommand = new();
+
     private static readonly TimeSpan HoldTime = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan NewNoteGap = TimeSpan.FromSeconds(0.25);
 
@@ -50,13 +52,6 @@ public partial class MainWindow : Window
 
         listener.PitchUpdated += reading => Dispatcher.BeginInvoke(() => OnPitch(reading));
 
-        foreach (var item in GuitarTuning.All)
-        {
-            var menuItem = new MenuItem { Header = item.DisplayName, Tag = item };
-            menuItem.Click += (_, _) => TuningBox.SelectedItem = item;
-            TuningMenu.Items.Add(menuItem);
-        }
-
         TuningBox.ItemsSource = GuitarTuning.All;
         TuningBox.SelectedIndex = 0;
 
@@ -64,8 +59,6 @@ public partial class MainWindow : Window
         DeviceBox.ItemsSource = devices;
         if (devices.Count > 0)
             DeviceBox.SelectedIndex = 0;
-        else
-            HintText.Text = "No microphone found";
     }
 
     private void OnPitch(PitchReading reading)
@@ -257,17 +250,24 @@ public partial class MainWindow : Window
             return;
 
         tuning = selected;
-        foreach (MenuItem item in TuningMenu.Items)
-            item.IsChecked = item.Tag == selected;
-
         BuildStringButtons();
         ShowIdle();
     }
 
     private void DeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // The microphone only runs while the tuner screen is open.
+        if (TunerView.Visibility == Visibility.Visible)
+            StartListening();
+    }
+
+    private void StartListening()
+    {
         if (DeviceBox.SelectedIndex < 0)
+        {
+            HintText.Text = "No microphone found";
             return;
+        }
 
         try
         {
@@ -304,6 +304,22 @@ public partial class MainWindow : Window
     {
         a4 = Math.Clamp(value, 415, 466);
         A4Text.Text = $"A4 = {a4:0} Hz";
+    }
+
+    private void StartTuning_Click(object sender, RoutedEventArgs e)
+    {
+        StartMenu.Visibility = Visibility.Collapsed;
+        TunerView.Visibility = Visibility.Visible;
+        ShowIdle();
+        StartListening();
+    }
+
+    private void BackToMenu_Click(object sender, RoutedEventArgs e)
+    {
+        listener.Stop();
+        tonePlayer.Stop();
+        TunerView.Visibility = Visibility.Collapsed;
+        StartMenu.Visibility = Visibility.Visible;
     }
 
     private void Quit_Executed(object sender, ExecutedRoutedEventArgs e) => Close();
