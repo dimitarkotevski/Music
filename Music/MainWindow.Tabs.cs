@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Music.Audio;
 using Music.Tabs;
@@ -153,7 +154,10 @@ public partial class MainWindow
 
         if (tabStringLock is int locked)
         {
-            TabAlternativesText.Text = $"Locked to {TabText.StringName(tuning.Strings, locked)}";
+            string lockedName = TabText.StringName(tuning.Strings, locked);
+            TabAlternativesText.Text = last.Position.String == locked
+                ? $"Locked to {lockedName}"
+                : $"Locked to {lockedName}; this note is outside its range";
             return;
         }
 
@@ -171,8 +175,91 @@ public partial class MainWindow
         for (int s = 0; s < tuning.Strings.Length; s++)
             choices.Add(TabText.StringName(tuning.Strings, s));
 
+        BuildTabStringButtons(choices);
         TabStringBox.ItemsSource = choices;
         TabStringBox.SelectedIndex = Math.Min(selected, choices.Count - 1);
+        RefreshTabStringButtons();
+    }
+
+    /// <summary>Quick string buttons: Auto plus one per string, keyed 6–1 like the guitar.</summary>
+    private void BuildTabStringButtons(IReadOnlyList<string> choices)
+    {
+        var style = (Style)FindResource("TabStringChoice");
+        TabStringButtonsPanel.Children.Clear();
+
+        for (int i = 0; i < choices.Count; i++)
+        {
+            string label = i == 0
+                ? "Auto"
+                : $"{tuning.Strings.Length - (i - 1)} {TabText.StringLabel(tuning.Strings, i - 1).Trim()}";
+            var button = new Button
+            {
+                Content = label,
+                Tag = i,
+                Style = style,
+                ToolTip = i == 0
+                    ? "Auto: guess the string from the notes you play (key 0)"
+                    : $"Play only on {choices[i]}; the fret is calculated (key {tuning.Strings.Length - (i - 1)})",
+            };
+            button.Click += TabStringButton_Click;
+            TabStringButtonsPanel.Children.Add(button);
+        }
+    }
+
+    private void TabStringButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int index } && index >= 0 && index < TabStringBox.Items.Count)
+            TabStringBox.SelectedIndex = index;
+    }
+
+    /// <summary>Paint the chosen string button amber so the current lock is obvious.</summary>
+    private void RefreshTabStringButtons()
+    {
+        foreach (Button button in TabStringButtonsPanel.Children.OfType<Button>())
+        {
+            bool selected = button.Tag is int index && index == TabStringBox.SelectedIndex;
+            button.Background = selected ? TabBrush : StringBrush;
+            button.BorderBrush = selected ? TabBrush : StringBrush;
+            button.Foreground = selected ? Brushes.Black : NeutralBrush;
+            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+        }
+    }
+
+    /// <summary>Keys 6–1 lock the matching guitar string; 0 returns to Auto.</summary>
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (TabView.Visibility != Visibility.Visible || TabTestPanel.Visibility == Visibility.Visible)
+            return;
+        if (Keyboard.Modifiers != ModifierKeys.None)
+            return;
+        if (Keyboard.FocusedElement is ComboBox { IsDropDownOpen: true })
+            return;
+
+        int number = e.Key switch
+        {
+            Key.D0 or Key.NumPad0 => 0,
+            Key.D1 or Key.NumPad1 => 1,
+            Key.D2 or Key.NumPad2 => 2,
+            Key.D3 or Key.NumPad3 => 3,
+            Key.D4 or Key.NumPad4 => 4,
+            Key.D5 or Key.NumPad5 => 5,
+            Key.D6 or Key.NumPad6 => 6,
+            Key.D7 or Key.NumPad7 => 7,
+            Key.D8 or Key.NumPad8 => 8,
+            Key.D9 or Key.NumPad9 => 9,
+            _ => -1,
+        };
+        if (number < 0)
+            return;
+        if (number > TabStringBox.Items.Count - 1)
+            return;
+
+        int index = number == 0 ? 0 : TabStringBox.Items.Count - number;
+        if (index < 0 || index >= TabStringBox.Items.Count)
+            return;
+
+        TabStringBox.SelectedIndex = index;
+        e.Handled = true;
     }
 
     private void TabStringBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -191,6 +278,7 @@ public partial class MainWindow
         }
 
         RefreshTab();
+        RefreshTabStringButtons();
     }
 
     private void UndoTab_Click(object sender, RoutedEventArgs e)

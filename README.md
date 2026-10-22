@@ -15,7 +15,7 @@ A GuitarTuna-style guitar tuner for Windows PC. It listens to your microphone, d
 - **Auto-detect string:** play any string and the tuner picks the nearest one. You can also click a string to lock onto it.
 - **Reference tones:** clicking a string plays its target note.
 - **14 tunings:** Standard, Drop D, Half Step Down, Full Step Down, C Standard, Drop C, Drop B, Drop A, Open G, Open D, Open E, Open A, Open C, DADGAD.
-- **Tabs:** every note you play is written as tablature, with a suggested string and fret. If you're playing on one string, pick it in the **Play on** box and the app won't guess. Click a note to move it to another string, then undo, clear or copy the whole tab as text.
+- **Tabs:** every note you play is written as tablature, with a suggested string and fret. If you're playing on one string, pick it in the **Play on** box or click one of the **6 E … 1 e** buttons and the app won't guess; keys **6–1** do the same, **0** returns to Auto. Click a note to move it to another string, then undo, clear or copy the whole tab as text.
 - **Background noise rejection:** an adaptive noise gate plus a stability check, with a **Sensitivity** slider for noisy rooms.
 - **Adjustable reference pitch:** A4 from 415 to 466 Hz (default 440 Hz).
 - **Microphone selection** and an input level meter (grey = ignored as noise, blue = being analysed).
@@ -42,7 +42,7 @@ You can also open `Music.slnx` in Visual Studio and press **F5**.
 2. Pick your tuning and microphone at the top.
 3. Pluck a string and let it ring. Tune until the needle sits in the green zone and the hint says **In tune ✓**.
 4. If it reacts to background noise, move the **Sensitivity** slider towards *Ignore noise*. If it misses quiet notes, move it towards *Pick up quiet*.
-5. To transcribe your playing, choose **Tabs** on the start menu and play single notes. Each note appears in the tab, with the string and fret the app thinks you used. If you're playing on one string — for example the low E — choose **String 6 (E)** in the **Play on** box so the app stops guessing. Click a note to move it to the next string where that pitch can be played. **Copy tab** puts the whole thing on the clipboard as plain text.
+5. To transcribe your playing, choose **Tabs** on the start menu and play single notes. Each note appears in the tab, with the string and fret the app thinks you used. If you're playing on one string — for example the low E — choose **String 6 (E)** in the **Play on** box, or click the **6 E** button / press **6**, so the app stops guessing. Click a note to move it to the next string where that pitch can be played. **Copy tab** puts the whole thing on the clipboard as plain text.
 
 > Tabs listens for one note at a time. Mute the previous string before playing the next note, and avoid chords or letting notes ring across strings.
 
@@ -52,6 +52,8 @@ You can also open `Music.slnx` in Visual Studio and press **F5**.
 |---|---|
 | `Esc` | Back to the start menu |
 | `Ctrl+Q` | Quit |
+| `6`–`1` (in Tabs) | Lock to string 6 (low E) … string 1 (high e) |
+| `0` (in Tabs) | Back to Auto string guessing |
 
 ## How it works
 
