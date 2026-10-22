@@ -14,6 +14,11 @@ public sealed class PitchDetector
     private const double OctaveCheckFloor = 0.02;
     private const double OctaveCheckRatio = 0.5;
 
+    // If the detected frequency has almost no energy of its own but a harmonic does, YIN has
+    // locked onto a subharmonic (a B string read as E2). Correct only when the fundamental is
+    // this weak, so a genuinely quiet low string is left alone.
+    private const double SubharmonicEnergyRatio = 0.15;
+
     private readonly int sampleRate;
     private readonly int tauMin;
     private readonly int tauMax;
@@ -71,7 +76,57 @@ public sealed class PitchDetector
         double denominator = s0 + s2 - 2 * s1;
         double refinedTau = denominator == 0 ? best : best + (s0 - s2) / (2 * denominator);
 
-        return sampleRate / refinedTau;
+        return CorrectSubharmonic(buffer, sampleRate / refinedTau);
+    }
+
+    /// <summary>
+    /// YIN can lock onto two or three times the real period when a string's fundamental is weak.
+    /// If the detected frequency has virtually no spectral energy but 2× or 3× it does, report the
+    /// stronger partial instead. Two-times correction is only used below 80 Hz, so a genuinely
+    /// quiet low E is not pulled up an octave; three-times catches the B-string-read-as-E2 case.
+    /// </summary>
+    private double CorrectSubharmonic(float[] buffer, double frequency)
+    {
+        double magnitude = Magnitude(buffer, frequency);
+        double best = frequency;
+        double bestMagnitude = magnitude;
+
+        // Above the standard low E, only a 3× error is safe to correct: a low note's 2nd harmonic
+        // can be louder than its fundamental without the fundamental being wrong.
+        int firstMultiple = frequency < 80 ? 2 : 3;
+        for (int multiple = firstMultiple; multiple <= 3; multiple++)
+        {
+            double candidate = frequency * multiple;
+            if (candidate >= sampleRate / 2.0)
+                break;
+
+            double candidateMagnitude = Magnitude(buffer, candidate);
+            if (candidateMagnitude > bestMagnitude)
+            {
+                best = candidate;
+                bestMagnitude = candidateMagnitude;
+            }
+        }
+
+        return best != frequency && magnitude < bestMagnitude * SubharmonicEnergyRatio ? best : frequency;
+    }
+
+    /// <summary>Magnitude of one frequency in the buffer (Hann-windowed Goertzel).</summary>
+    private double Magnitude(float[] buffer, double frequency)
+    {
+        double coefficient = 2 * Math.Cos(2 * Math.PI * frequency / sampleRate);
+        double s1 = 0, s2 = 0, windowSum = 0;
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            double window = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (buffer.Length - 1));
+            double s0 = buffer[i] * window + coefficient * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+            windowSum += window;
+        }
+
+        double power = s1 * s1 + s2 * s2 - coefficient * s1 * s2;
+        return Math.Sqrt(Math.Max(0, power)) / Math.Max(1e-9, windowSum);
     }
 
     /// <summary>

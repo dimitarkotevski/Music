@@ -8,6 +8,7 @@ A map of the code so you can find things quickly. Start with the table below, th
 | [Audio layer](audio.md) | Microphone capture, noise gate, YIN pitch detection, reference tones |
 | [Tuner](tuner.md) | Tuner screen: gauge, string selection, auto-detect, smoothing |
 | [Chords](chords.md) | Chord recognition (FFT → chromagram → template matching), chord shapes and diagrams, chord screen |
+| [Tabs](tabs.md) | Writing played notes as tablature: note tracking, choosing the string, the tab view |
 | [Metronome](metronome.md) | Click engine and metronome screen |
 | [Music theory helpers](music-theory.md) | Note/frequency/cents maths, guitar tunings |
 
@@ -18,9 +19,10 @@ A map of the code so you can find things quickly. Start with the table below, th
 ```
 Music/
 ├── App.xaml(.cs)               App entry point, opens MainWindow
-├── MainWindow.xaml             All screens: start menu, tuner, chords, metronome
+├── MainWindow.xaml             All screens: start menu, tuner, chords, tabs, metronome
 ├── MainWindow.xaml.cs          Shared window logic + tuner screen
 ├── MainWindow.Chords.cs        Chord screen (partial class)
+├── MainWindow.Tabs.cs          Tabs screen (partial class)
 ├── MainWindow.Metronome.cs     Metronome screen (partial class)
 ├── Audio/
 │   ├── MicrophoneListener.cs   Mic capture, noise gate, raises pitch/sample events
@@ -32,7 +34,12 @@ Music/
 │   ├── ChordDetector.cs        Chord recognition
 │   └── ChordShape.cs           Guitar fingerings + shape library
 ├── Controls/
-│   └── ChordDiagram.cs         Draws a chord box (fretboard diagram)
+│   ├── ChordDiagram.cs         Draws a chord box (fretboard diagram)
+│   └── TabStaff.cs             Draws tablature, clickable notes
+├── Tabs/
+│   ├── NoteTracker.cs          Pitch readings → one event per played note
+│   ├── FretAssigner.cs         Chooses the string/fret for each note
+│   └── TabNote.cs              Written notes + plain-text tab formatting
 └── Tuning/
     ├── NoteMath.cs             Frequency ↔ note ↔ cents conversions
     └── GuitarTuning.cs         The list of guitar tunings
@@ -54,6 +61,9 @@ Music/
 | Fix wrong slash chords / bass note | `ChordDetector.FindBass` |
 | Change how a chord is fingered | `ChordShapes` (`OpenShapes`, `EShapes`, `AShapes`) in [Chords/ChordShape.cs](../../Music/Chords/ChordShape.cs) |
 | Change how chord diagrams look | `ChordDiagram.OnRender` in [Controls/ChordDiagram.cs](../../Music/Controls/ChordDiagram.cs) |
+| Tabs: notes missed or doubled | `NoteTracker` constants in [Tabs/NoteTracker.cs](../../Music/Tabs/NoteTracker.cs) |
+| Tabs: wrong string chosen | `FretAssigner.Cost` in [Tabs/FretAssigner.cs](../../Music/Tabs/FretAssigner.cs) |
+| Tabs: change the copied text format | `TabText.Format` in [Tabs/TabNote.cs](../../Music/Tabs/TabNote.cs) |
 | Change the metronome click sound | `ClickTrack.CreateClick` in [Audio/Metronome.cs](../../Music/Audio/Metronome.cs) |
 | Change the tuner's reference tone | `TonePlayer.PluckedTone` in [Audio/TonePlayer.cs](../../Music/Audio/TonePlayer.cs) |
 | Change colours | The `…Brush` fields, see [colour table](app-and-navigation.md#colours) |
@@ -67,7 +77,9 @@ Microphone ──► MicrophoneListener (44.1 kHz mono, 50 ms blocks, noise gate
                  │
                  ├─ PitchUpdated ──► PitchDetector (YIN) ──► MainWindow.OnPitch ──► tuner gauge
                  │
-                 └─ SamplesCaptured ──► ChordDetector (FFT, chroma) ──► ShowChordAnalysis ──► chord screen
+                 ├─ SamplesCaptured ──► ChordDetector (FFT, chroma) ──► ShowChordAnalysis ──► chord screen
+                 │
+                 └─ PitchUpdated (tabListener) ──► NoteTracker ──► FretAssigner ──► TabStaff ──► tabs screen
 
 Metronome.ClickTrack ──► speakers          (Beat event ──► ShowBeat ──► beat lights)
 TonePlayer.PluckedTone ──► speakers        (string button clicks)

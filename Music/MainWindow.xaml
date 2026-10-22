@@ -110,6 +110,8 @@
             <Button Content="Tuning" Style="{StaticResource MenuButton}" Background="#5B8CFF" Click="StartTuning_Click" />
             <Button Content="Chords" Style="{StaticResource MenuButton}" Background="#14B8A6" Margin="0,14,0,0"
                     Click="StartChords_Click" />
+            <Button Content="Tabs" Style="{StaticResource MenuButton}" Background="#F59E0B" Margin="0,14,0,0"
+                    Click="StartTabs_Click" />
             <Button Content="Metronome" Style="{StaticResource MenuButton}" Background="#8B5CF6" Margin="0,14,0,0"
                     Click="StartMetronome_Click" />
             <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
@@ -272,6 +274,129 @@
                                  BorderThickness="0"
                                  ToolTip="Grey = treated as background noise, teal = loud enough to be analysed" />
                 </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- Tabs: every played note written as tablature -->
+        <DockPanel x:Name="TabView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabTuningBox" Grid.Column="1" Height="28" DisplayMemberPath="DisplayName"
+                              SelectionChanged="TabTuningBox_SelectionChanged" />
+                    <TextBlock Grid.Row="1" Text="Microphone" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabDeviceBox" Grid.Row="1" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="TabDeviceBox_SelectionChanged" />
+                    <TextBlock Grid.Row="2" Text="Play on" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabStringBox" Grid.Row="2" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="TabStringBox_SelectionChanged"
+                              ToolTip="Auto guesses the string. Pick one to force every note onto that string." />
+                </Grid>
+
+                <!-- Current note -->
+                <Border Grid.Row="1" Background="#232733" CornerRadius="12" Padding="18,12" Margin="0,16,0,0">
+                    <DockPanel>
+                        <TextBlock x:Name="TabNoteText" Text="–" FontSize="56" FontWeight="Bold" Width="130"
+                                   VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock x:Name="TabStringText" Text="Play one note at a time" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TabFretText" Text="Mute the previous string before the next note" FontSize="15"
+                                       Foreground="#9AA0B4" Margin="0,2,0,0" />
+                            <TextBlock x:Name="TabAlternativesText" Text=" " FontSize="12" Foreground="#6C7389"
+                                       Margin="0,6,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <DockPanel Grid.Row="2" Margin="0,14,0,8" LastChildFill="False">
+                    <TextBlock Text="Click a note to move it to another string" Foreground="#6C7389" FontSize="12"
+                               VerticalAlignment="Center" />
+                    <Button DockPanel.Dock="Right" Content="Guided test" Style="{StaticResource SmallButton}" Width="94"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="StartTabTest_Click"
+                            ToolTip="The app names notes one by one and records you playing them" />
+                    <Button DockPanel.Dock="Right" Content="Copy tab" Style="{StaticResource SmallButton}" Width="86"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="CopyTab_Click"
+                            ToolTip="Copy the tab as text, ready to paste anywhere" />
+                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="ClearTab_Click" />
+                    <Button DockPanel.Dock="Right" Content="Undo" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Click="UndoTab_Click" ToolTip="Remove the last note" />
+                </DockPanel>
+
+                <Border Grid.Row="3" Background="#1B1E27" CornerRadius="10" Padding="4,6">
+                    <ScrollViewer x:Name="TabScroll" VerticalScrollBarVisibility="Auto">
+                        <controls:TabStaff x:Name="TabStaffView" HighlightBrush="#F59E0B" />
+                    </ScrollViewer>
+                </Border>
+
+                <DockPanel Grid.Row="4" Margin="0,14,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="TabLevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, amber = loud enough to be analysed" />
+                </DockPanel>
+
+                <!-- Guided test overlay: names each note and records the take -->
+                <Border x:Name="TabTestPanel" Grid.RowSpan="5" Panel.ZIndex="10" Background="#E615171E"
+                        Visibility="Collapsed">
+                    <Border Background="#232733" CornerRadius="18" Padding="30,26" Width="450"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#3A4050" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock x:Name="TabTestTitle" Text="GUIDED TEST" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="#F59E0B" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TabTestNoteText" Text="…" FontSize="76" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            <TextBlock x:Name="TabTestInstructionText" Text="Get ready" FontSize="21"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <Border Background="#1B1E27" CornerRadius="10" Padding="4,4" Margin="0,12,0,0">
+                                <controls:TabStaff x:Name="TabTestStaff" Height="150" IsHitTestVisible="False"
+                                                   HighlightBrush="#F59E0B" />
+                            </Border>
+                            <TextBlock x:Name="TabTestProgressText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <TextBlock x:Name="TabTestStatusText" Text="Recording…" FontSize="12" Foreground="#6C7389"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Margin="0,12,0,0" />
+                            <TextBlock Text="The note stays until you click Next. Mute each string before the next one."
+                                       FontSize="12" Foreground="#6C7389" HorizontalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+                                <Button x:Name="TabTestNextButton" Content="Next" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="NextTabTest_Click" ToolTip="Record this note and show the next one" />
+                                <Button x:Name="TabTestFolderButton" Content="Open folder" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Visibility="Collapsed" Click="OpenTabTestFolder_Click" />
+                                <Button x:Name="TabTestCancelButton" Content="Cancel" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Click="CancelTabTest_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Border>
             </Grid>
         </DockPanel>
 

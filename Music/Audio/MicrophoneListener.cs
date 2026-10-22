@@ -14,13 +14,34 @@ public readonly record struct AudioBlock(float[] Samples, double Level, double G
 public sealed class MicrophoneListener : IDisposable
 {
     public const int SampleRate = 44100;
-    private const int WindowSize = 4096;
     private const double MinimumGate = 0.003;
 
-    private readonly float[] window = new float[WindowSize];
-    private readonly PitchDetector detector = new(SampleRate, WindowSize);
+    private readonly int windowSize;
+    private readonly int bufferMilliseconds;
+    private readonly float[] window;
+    private readonly PitchDetector detector;
+    private readonly double noiseFloorFallRate;
+    private readonly double noiseFloorRiseRate;
+    private readonly object recorderLock = new();
     private WaveInEvent? waveIn;
+    private WaveFileWriter? recorder;
     private double noiseFloor = 0.002;
+
+    /// <param name="windowSize">Samples analysed for pitch. Shorter reacts faster to new notes; 2048 still reaches 50 Hz.</param>
+    /// <param name="bufferMilliseconds">How often a block is delivered.</param>
+    /// <param name="maxFrequency">Highest pitch detected.</param>
+    public MicrophoneListener(int windowSize = 4096, int bufferMilliseconds = 50, double maxFrequency = 1000)
+    {
+        this.windowSize = windowSize;
+        this.bufferMilliseconds = bufferMilliseconds;
+        window = new float[windowSize];
+        detector = new PitchDetector(SampleRate, windowSize, maxFrequency: maxFrequency);
+
+        // The noise floor adapts at the same speed in real time whatever the block length.
+        double blocksPer50Ms = bufferMilliseconds / 50.0;
+        noiseFloorFallRate = 1 - Math.Pow(1 - 0.3, blocksPer50Ms);
+        noiseFloorRiseRate = 1 - Math.Pow(1 - 0.003, blocksPer50Ms);
+    }
 
     /// <summary>Raised on the audio thread. Pitch detection only runs while this has subscribers.</summary>
     public event Action<PitchReading>? PitchUpdated;
@@ -30,6 +51,14 @@ public sealed class MicrophoneListener : IDisposable
 
     /// <summary>How far above the background noise level a sound must be to be analysed.</summary>
     public double GateRatio { get; set; } = 4;
+
+    /// <summary>
+    /// Set by a <see cref="SamplesCaptured"/> handler (during the callback) when it recognises music in the
+    /// block, so the noise floor doesn't creep up. Set automatically when a pitch is detected.
+    /// </summary>
+    public bool MusicPresent { get; set; }
+
+    public bool IsRunning => waveIn is not null;
 
     public static IReadOnlyList<string> GetDevices() =>
         Enumerable.Range(0, WaveInEvent.DeviceCount)
@@ -46,7 +75,7 @@ public sealed class MicrophoneListener : IDisposable
         {
             DeviceNumber = deviceNumber,
             WaveFormat = new WaveFormat(SampleRate, 16, 1),
-            BufferMilliseconds = 50,
+            BufferMilliseconds = bufferMilliseconds,
         };
         waveIn.DataAvailable += OnDataAvailable;
         waveIn.StartRecording();
@@ -54,13 +83,35 @@ public sealed class MicrophoneListener : IDisposable
 
     public void Stop()
     {
-        if (waveIn is null)
-            return;
+        if (waveIn is not null)
+        {
+            waveIn.DataAvailable -= OnDataAvailable;
+            waveIn.StopRecording();
+            waveIn.Dispose();
+            waveIn = null;
+        }
 
-        waveIn.DataAvailable -= OnDataAvailable;
-        waveIn.StopRecording();
-        waveIn.Dispose();
-        waveIn = null;
+        StopRecording();
+    }
+
+    /// <summary>Starts writing the captured microphone audio to a 44.1 kHz, 16-bit mono WAV.</summary>
+    public void StartRecording(string path)
+    {
+        lock (recorderLock)
+        {
+            recorder?.Dispose();
+            recorder = new WaveFileWriter(path, new WaveFormat(SampleRate, 16, 1));
+        }
+    }
+
+    /// <summary>Finishes and closes the WAV started by <see cref="StartRecording"/>.</summary>
+    public void StopRecording()
+    {
+        lock (recorderLock)
+        {
+            recorder?.Dispose();
+            recorder = null;
+        }
     }
 
     public void Dispose() => Stop();
@@ -68,31 +119,40 @@ public sealed class MicrophoneListener : IDisposable
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         int received = e.BytesRecorded / 2;
-        int count = Math.Min(received, WindowSize);
+        int count = Math.Min(received, windowSize);
         int skip = received - count;
 
         // Slide the analysis window and append the newest samples.
-        Array.Copy(window, count, window, 0, WindowSize - count);
+        Array.Copy(window, count, window, 0, windowSize - count);
         for (int i = 0; i < count; i++)
-            window[WindowSize - count + i] = BitConverter.ToInt16(e.Buffer, (skip + i) * 2) / 32768f;
+            window[windowSize - count + i] = BitConverter.ToInt16(e.Buffer, (skip + i) * 2) / 32768f;
+
+        lock (recorderLock)
+            recorder?.WriteSamples(window, windowSize - count, count);
 
         double sumSquares = 0;
-        for (int i = WindowSize - count; i < WindowSize; i++)
+        for (int i = windowSize - count; i < windowSize; i++)
             sumSquares += window[i] * window[i];
         double level = Math.Sqrt(sumSquares / Math.Max(1, count));
 
-        // Track the room's background level: drop quickly to quiet moments, rise only slowly,
-        // so a ringing string doesn't get mistaken for noise.
-        double rate = level < noiseFloor ? 0.3 : 0.003;
-        noiseFloor = Math.Max(0.0005, noiseFloor + rate * (level - noiseFloor));
+        // Track the room's background level: drop quickly to quiet moments...
+        if (level < noiseFloor)
+            noiseFloor = Math.Max(0.0005, noiseFloor + noiseFloorFallRate * (level - noiseFloor));
 
         double gate = Math.Max(MinimumGate, noiseFloor * GateRatio);
+        MusicPresent = false;
         SamplesCaptured?.Invoke(new AudioBlock(window[^count..], level, gate));
 
         if (PitchUpdated is { } pitchUpdated)
         {
             double? frequency = level >= gate ? detector.Detect(window) : null;
+            MusicPresent |= frequency is not null;
             pitchUpdated(new PitchReading(frequency, level, gate));
         }
+
+        // ...but rise only slowly, and never while music is being heard. Otherwise continuous
+        // playing (no quiet moments) would slowly push the gate above the notes themselves.
+        if (level > noiseFloor && !MusicPresent)
+            noiseFloor += noiseFloorRiseRate * (level - noiseFloor);
     }
 }

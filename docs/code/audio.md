@@ -13,22 +13,26 @@ Shared audio code in [Music/Audio/](../../Music/Audio/). Uses [NAudio](https://g
 
 ## MicrophoneListener
 
-Captures **44.1 kHz, 16-bit mono** audio in **50 ms** blocks (`SampleRate`, `BufferMilliseconds`).
+Captures **44.1 kHz, 16-bit mono** audio. The constructor `MicrophoneListener(windowSize = 4096, bufferMilliseconds = 50, maxFrequency = 1000)` sets the pitch window, block length and highest detected pitch. The tuner and chords use the defaults; tabs use `(2048, 25, 1350)` to react faster and reach high frets.
 
 | Member | What it does |
 |---|---|
 | `GetDevices()` | Names of all input devices (for the microphone dropdowns) |
 | `Start(deviceNumber)` / `Stop()` | Open/close the mic. `Start` also resets the window and the noise floor |
+| `IsRunning` | True after the mic opened; used by the guided test to fail early |
+| `StartRecording(path)` / `StopRecording()` | Write the captured blocks to a 44.1 kHz, 16-bit mono WAV (guided test) |
 | `PitchUpdated` event | `PitchReading(Frequency?, Level, Gate)` per block. **Pitch detection only runs if something is subscribed** |
 | `SamplesCaptured` event | `AudioBlock(Samples, Level, Gate)` per block with the new samples; `HasSignal` = above the gate |
 | `GateRatio` | How much louder than the room a sound must be (set by the tuner's Sensitivity slider) |
-| `OnDataAvailable` | Per-block work: slide the 4096-sample window, compute RMS level, update the noise floor, raise events |
+| `MusicPresent` | Set when the block contains music: automatically when a pitch is found, or by a `SamplesCaptured` handler during the callback (the chord screen sets it when a chord is recognised) |
+| `OnDataAvailable` | Per-block work: slide the window, compute RMS level, update the noise floor, raise events |
 
 **Noise gate** (in `OnDataAvailable`):
-- `noiseFloor` follows the room level: it drops fast in quiet moments (rate 0.3) and rises slowly (0.003), so a ringing string isn't mistaken for noise.
+- `noiseFloor` follows the room level. It drops fast in quiet moments and rises slowly, **and never rises while `MusicPresent` is set**. Otherwise, continuous playing with no quiet moments would push the gate above the notes after a few seconds.
+- The rates (`noiseFloorFallRate`, `noiseFloorRiseRate`) are scaled by the block length, so they behave the same in real time for 25 ms and 50 ms blocks.
 - `gate = max(MinimumGate, noiseFloor × GateRatio)`. Below the gate, no pitch is detected.
 
-Two instances exist: `listener` for the tuner (subscribes `PitchUpdated`) and `chordListener` for chords (subscribes `SamplesCaptured`, so it skips YIN).
+Three instances exist: `listener` (tuner, `PitchUpdated`), `chordListener` (chords, `SamplesCaptured`, so it skips YIN) and `tabListener` (tabs, `PitchUpdated` with the faster settings).
 
 ## PitchDetector
 
@@ -39,6 +43,7 @@ The [YIN algorithm](http://audition.ens.fr/adc/pdf/2002_JASA_YIN.pdf) on a 4096-
 2. **Absolute threshold**: the first dip below `Threshold` (0.1; lower = stricter), walked down to its local minimum.
 3. **`CorrectOctaveError`**: if 2× or 3× that period is much more periodic (`OctaveCheckRatio` 0.5) and the chosen dip isn't already clean (`OctaveCheckFloor` 0.02), use the longer period. This fixes strings read an octave too high when the 2nd/3rd harmonic is strong, e.g. the A string showing as G.
 4. **Parabolic interpolation** for sub-sample (sub-cent) accuracy.
+5. **`CorrectSubharmonic`**: if the detected frequency has almost no energy of its own (`SubharmonicEnergyRatio` 0.15) but 2× or 3× it does, report the stronger partial. Below 80 Hz both 2× and 3× are checked (A1 → A2, E1 → E2); above 80 Hz only 3× is checked, so a quiet low E is not pulled up an octave. This fixes YIN locking onto a multiple of the period (a B string read as E2, or the A string read as A1).
 
 Returns `null` when nothing is periodic enough.
 
@@ -46,6 +51,7 @@ Returns `null` when nothing is periodic enough.
 |---|---|
 | Detect quieter or less clean notes | Raise `Threshold` (more noise gets through) |
 | Fewer octave-down mistakes | Lower `OctaveCheckRatio` or raise `OctaveCheckFloor` |
+| Fewer subharmonic mistakes (A1/B read as low E) | `SubharmonicEnergyRatio`, or the 80 Hz split in `CorrectSubharmonic` |
 | Lower/higher notes | `minFrequency` / `maxFrequency` constructor arguments |
 
 ## TonePlayer

@@ -67,6 +67,7 @@ public partial class MainWindow : Window
 
         InitializeMetronome();
         InitializeChords();
+        InitializeTabs();
     }
 
     private void OnPitch(PitchReading reading)
@@ -282,13 +283,24 @@ public partial class MainWindow : Window
         autoString = null;
         BuildStringButtons();
         ShowIdle();
+
+        // Keep the tabs screen on the same tuning (it decides which string each note is on).
+        if (TabTuningBox.ItemsSource is not null)
+        {
+            if (TabTuningBox.SelectedItem != selected)
+                TabTuningBox.SelectedItem = selected;
+            RefreshTabStringChoices();
+            RefreshTab();
+        }
     }
 
     private void DeviceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Keep the microphone choice shared with the chords screen.
+        // Keep the microphone choice shared with the chords and tabs screens.
         if (ChordDeviceBox.ItemsSource is not null && ChordDeviceBox.SelectedIndex != DeviceBox.SelectedIndex)
             ChordDeviceBox.SelectedIndex = DeviceBox.SelectedIndex;
+        if (TabDeviceBox.ItemsSource is not null && TabDeviceBox.SelectedIndex != DeviceBox.SelectedIndex)
+            TabDeviceBox.SelectedIndex = DeviceBox.SelectedIndex;
 
         // The microphone only runs while the tuner screen is open.
         if (TunerView.Visibility == Visibility.Visible)
@@ -350,12 +362,15 @@ public partial class MainWindow : Window
 
     private void BackToMenu_Click(object sender, RoutedEventArgs e)
     {
+        StopTabTest();
         listener.Stop();
         chordListener.Stop();
+        tabListener.Stop();
         tonePlayer.Stop();
         StopMetronome();
         TunerView.Visibility = Visibility.Collapsed;
         ChordView.Visibility = Visibility.Collapsed;
+        TabView.Visibility = Visibility.Collapsed;
         MetronomeView.Visibility = Visibility.Collapsed;
         StartMenu.Visibility = Visibility.Visible;
     }
@@ -364,8 +379,10 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
+        StopTabTest();
         listener.Dispose();
         chordListener.Dispose();
+        tabListener.Dispose();
         tonePlayer.Dispose();
         metronome.Dispose();
     }

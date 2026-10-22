@@ -28,6 +28,7 @@ public partial class MainWindow
         chordListener.SamplesCaptured += block =>
         {
             var analysis = chordDetector.Process(block.Samples, block.HasSignal);
+            chordListener.MusicPresent = analysis.Chord is not null;
             Dispatcher.BeginInvoke(() => ShowChordAnalysis(analysis, block));
         };
 

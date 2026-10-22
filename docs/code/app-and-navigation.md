@@ -23,18 +23,21 @@ Each screen is a panel in `MainWindow.xaml`. Exactly one is `Visible`; the other
 | Start menu | `StartMenu` | App start, `BackToMenu_Click` | [MainWindow.xaml.cs](../../Music/MainWindow.xaml.cs) |
 | Tuner | `TunerView` | `StartTuning_Click` | [Tuner](tuner.md) |
 | Chords | `ChordView` | `StartChords_Click` | [Chords](chords.md) |
+| Tabs | `TabView` | `StartTabs_Click` | [Tabs](tabs.md) |
 | Metronome | `MetronomeView` | `StartMetronome_Click` | [Metronome](metronome.md) |
 
-The start menu buttons in order: **Tuning** (blue), **Chords** (teal), **Metronome** (purple), **Quit**.
+The start menu buttons in order: **Tuning** (blue), **Chords** (teal), **Tabs** (amber), **Metronome** (purple), **Quit**.
+
+Tuning and microphone choices are shared: the tuner's `TuningBox` and `DeviceBox` are the master copies, and the chords/tabs screens' boxes (`ChordDeviceBox`, `TabTuningBox`, `TabDeviceBox`) are synced both ways in their `SelectionChanged` handlers.
 
 ### Going back to the menu
 
 `BackToMenu_Click` (the **← Menu** button on every screen, or **Esc** via `BackToMenuCommand`):
 
-1. Stops everything that makes or records sound: `listener.Stop()`, `chordListener.Stop()`, `tonePlayer.Stop()`, `StopMetronome()`.
+1. Stops everything that makes or records sound: `listener.Stop()`, `chordListener.Stop()`, `tabListener.Stop()`, `tonePlayer.Stop()`, `StopMetronome()`.
 2. Collapses all screens and shows `StartMenu`.
 
-The microphone only runs while the tuner or chord screen is open.
+Each microphone only runs while its screen is open (tuner, chords or tabs).
 
 ### Adding a new screen
 
@@ -52,9 +55,9 @@ The microphone only runs while the tuner or chord screen is open.
 1. `InitializeComponent()`, then `DrawGauge()` (tuner gauge ticks).
 2. Subscribes `listener.PitchUpdated` → `OnPitch`.
 3. Fills the tuning dropdown (`TuningBox`) and microphone dropdown (`DeviceBox`).
-4. `InitializeMetronome()` and `InitializeChords()`.
+4. `InitializeMetronome()`, `InitializeChords()` and `InitializeTabs()`.
 
-**Closing** (`Window_Closing`): disposes `listener`, `chordListener`, `tonePlayer`, `metronome`.
+**Closing** (`Window_Closing`): disposes `listener`, `chordListener`, `tabListener`, `tonePlayer`, `metronome`.
 
 ## Keyboard shortcuts
 
@@ -94,5 +97,6 @@ Brushes are `static readonly` fields, frozen with `Freeze()` for performance.
 | `ChromaBrush` | `#3A4155` | Non-chord-tone bars | MainWindow.Chords.cs |
 | `MetronomeBrush` | `#8B5CF6` purple | Metronome Start button, beat lights | MainWindow.Metronome.cs |
 | `StopBrush` | `#E5484D` red | Metronome Stop button | MainWindow.Metronome.cs |
+| `TabBrush` | `#F59E0B` amber | Tabs level bar (the latest-note highlight uses the same colour via `HighlightBrush` in XAML) | MainWindow.Tabs.cs |
 
 The window background `#15171E` and the top bar `#232733` are set in the XAML.
