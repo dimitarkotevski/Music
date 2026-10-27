@@ -19,6 +19,7 @@ public sealed class TabStaff : FrameworkElement
     private static readonly Brush LabelBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xA0, 0xB4)));
     private static readonly Brush TextBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xE8, 0xEF)));
     private static readonly Brush BackgroundBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x15, 0x17, 0x1E)));
+    private static readonly Brush UncertainBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)));
 
     private readonly List<(Rect Bounds, int Index)> noteBounds = [];
 
@@ -81,6 +82,11 @@ public sealed class TabStaff : FrameworkElement
             var text = MakeText(note.Position.Fret.ToString(CultureInfo.InvariantCulture), Font, 14, highlighted ? Brushes.White : TextBrush);
             var bounds = new Rect(center.X - Math.Max(9, text.Width / 2 + 4), center.Y - 9, Math.Max(18, text.Width + 8), 18);
             dc.DrawRoundedRectangle(highlighted ? HighlightBrush : BackgroundBrush, null, bounds, 5, 5);
+            if (note.Confidence < 0.5)
+            {
+                var uncertainPen = new Pen(UncertainBrush, 1.2) { DashStyle = DashStyles.Dot };
+                dc.DrawRoundedRectangle(null, uncertainPen, bounds, 5, 5);
+            }
             dc.DrawText(text, new Point(center.X - text.Width / 2, center.Y - text.Height / 2));
             noteBounds.Add((bounds, index));
         }

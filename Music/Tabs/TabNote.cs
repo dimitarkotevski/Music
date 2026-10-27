@@ -4,7 +4,11 @@ using Music.Tuning;
 namespace Music.Tabs;
 
 /// <summary>A note written in the tab. <paramref name="GapBefore"/> marks a pause before it.</summary>
-public sealed record TabNote(int Midi, FretPosition Position, bool GapBefore);
+public sealed record TabNote(int Midi, FretPosition Position, bool GapBefore)
+{
+    /// <summary>How clearly the string/fret won over the alternatives (1 = locked or only one position).</summary>
+    public double Confidence { get; init; } = 1;
+}
 
 public static class TabText
 {

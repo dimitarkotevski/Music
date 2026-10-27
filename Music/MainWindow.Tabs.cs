@@ -25,6 +25,11 @@ public partial class MainWindow
     private DateTime lastTabNoteTime = DateTime.MinValue;
     private int? tabStringLock;
 
+    // Temporary live-input diagnostic: lets us see whether the microphone, the pitch
+    // detector, or the note tracker is where a second string gets lost.
+    private readonly object tabDebugLock = new();
+    private StreamWriter? tabDebugWriter;
+
     // Guided test: the app names each note, shows it on the tab and records the take until Next is clicked.
     private readonly List<TabTestStep> tabTestSteps = [];
     private readonly List<(int Index, TabTestStep Step, double Start, double End)> tabTestWindows = [];
@@ -43,11 +48,21 @@ public partial class MainWindow
         // Note tracking runs on the audio thread; only finished notes go to the UI.
         tabListener.PitchUpdated += reading =>
         {
-            var note = noteTracker.Process(reading.Frequency, reading.Level, reading.Gate);
+            var note = noteTracker.Process(
+                reading.Frequency,
+                reading.Level,
+                reading.Gate,
+                reading.SpectralFrequency);
+            LogTabDebug($"audio yin={DebugNote(reading.Frequency)} spec={DebugNote(reading.SpectralFrequency)} "
+                + $"bright={(reading.Brightness is double b ? b.ToString("0.00") : "-")} "
+                + $"specbright={(reading.SpectralBrightness is double sb ? sb.ToString("0.00") : "-")} "
+                + $"level={reading.Level:0.0000} gate={reading.Gate:0.0000} "
+                + $"event={(note is DetectedNote n ? DebugNote(n.Midi) : "-")} {noteTracker.DebugState}");
             Dispatcher.BeginInvoke(() => ShowTabInput(reading, note));
         };
 
         TabStaffView.NoteClicked += MoveTabNoteToNextString;
+        tabListener.DetectHarmonics = true;
         TabTuningBox.ItemsSource = GuitarTuning.All;
         TabTuningBox.SelectedItem = tuning;
         TabDeviceBox.ItemsSource = DeviceBox.ItemsSource;
@@ -76,6 +91,7 @@ public partial class MainWindow
             noteTracker.A4 = a4;
             noteTracker.Reset();
             tabListener.GateRatio = listener.GateRatio;
+            StartTabDebugLog();
             tabListener.Start(TabDeviceBox.SelectedIndex);
         }
         catch (Exception ex)
@@ -94,18 +110,102 @@ public partial class MainWindow
         TabLevelBar.Foreground = reading.Level >= reading.Gate ? TabBrush : LevelGatedBrush;
 
         if (note is DetectedNote detected)
-            AddTabNote(detected.Midi);
+        {
+            int yinMidi = reading.Frequency is double yin
+                ? (int)Math.Round(NoteMath.FrequencyToMidi(yin, a4))
+                : -1;
+            int spectralMidi = reading.SpectralFrequency is double spectral
+                ? (int)Math.Round(NoteMath.FrequencyToMidi(spectral, a4))
+                : -1;
+            double? brightness = detected.Midi == yinMidi
+                ? reading.Brightness
+                : detected.Midi == spectralMidi
+                    ? reading.SpectralBrightness
+                    : null;
+            AddTabNote(detected.Midi, brightness);
+        }
     }
 
-    private void AddTabNote(int midi)
+    private string DebugNote(int midi) => NoteMath.Name(midi) + NoteMath.Octave(midi);
+
+    private string DebugNote(double? frequency) => frequency is double value
+        ? $"{DebugNote((int)Math.Round(NoteMath.FrequencyToMidi(value, a4)))} {value:0.0}Hz"
+        : "-";
+
+    private void StartTabDebugLog()
+    {
+        try
+        {
+            StopTabDebugLog();
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            if (string.IsNullOrEmpty(desktop))
+                desktop = AppContext.BaseDirectory;
+            string folder = Path.Combine(desktop, "GuitarTabsTest");
+            Directory.CreateDirectory(folder);
+            string path = Path.Combine(folder, "tab-live.txt");
+
+            var writer = new StreamWriter(path, append: false) { AutoFlush = true };
+            writer.WriteLine("Tabs live input diagnostic");
+            writer.WriteLine("Tuning: " + string.Join(" ", tuning.Strings.Select(m => DebugNote(m))));
+            writer.WriteLine("Written: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            writer.WriteLine("time\tyin\tspectral\tlevel\tgate\tevent\tstate");
+            lock (tabDebugLock)
+                tabDebugWriter = writer;
+        }
+        catch
+        {
+            // Diagnostics must never stop the microphone.
+        }
+    }
+
+    private void StopTabDebugLog()
+    {
+        lock (tabDebugLock)
+        {
+            tabDebugWriter?.Dispose();
+            tabDebugWriter = null;
+        }
+    }
+
+    private void LogTabDebug(string line)
+    {
+        lock (tabDebugLock)
+        {
+            try
+            {
+                tabDebugWriter?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}\t{line}");
+            }
+            catch
+            {
+                // Ignore a failed diagnostic write.
+            }
+        }
+    }
+
+    private void AddTabNote(int midi, double? brightness = null)
     {
         DateTime now = DateTime.UtcNow;
-        if (fretAssigner.Assign(midi, tuning.Strings, now, tabStringLock) is not FretPosition position)
-            return; // out of the guitar's range in this tuning, or not on the locked string
+        if (fretAssigner.Estimate(midi, tuning.Strings, now, tabStringLock, brightness) is not FretEstimate estimate)
+        {
+            // A locked string is a promise: notes that cannot be played on it are dropped.
+            // Say so instead of looking as if the new note was never heard.
+            LogTabDebug($"ui drop midi={DebugNote(midi)} lock={tabStringLock?.ToString() ?? "auto"}");
+            if (tabStringLock is int locked)
+            {
+                TabStringText.Text = "Note outside the locked string";
+                TabFretText.Text = $"{NoteMath.Name(midi)}{NoteMath.Octave(midi)} is not on "
+                    + $"{TabText.StringName(tuning.Strings, locked)}. Press 0 for Auto.";
+            }
 
+            return;
+        }
+
+        FretPosition position = estimate.Position;
+        LogTabDebug($"ui add midi={DebugNote(midi)} string={position.String + 1} fret={position.Fret} "
+            + $"confidence={estimate.Confidence:0.00} brightness={(brightness is double b ? b.ToString("0.00") : "-")}");
         bool gap = tabNotes.Count > 0 && now - lastTabNoteTime > TabGap;
         lastTabNoteTime = now;
-        tabNotes.Add(new TabNote(midi, position, gap));
+        tabNotes.Add(new TabNote(midi, position, gap) { Confidence = estimate.Confidence });
         RefreshTab();
         TabScroll.ScrollToEnd();
     }
@@ -120,11 +220,11 @@ public partial class MainWindow
 
         int current = positions.ToList().FindIndex(p => p == note.Position);
         var next = positions[(current + 1) % positions.Count];
-        tabNotes[index] = note with { Position = next };
+        tabNotes[index] = note with { Position = next, Confidence = 1 };
 
         // Moving the latest note also tells the assigner where the hand is for the next notes.
         if (index == tabNotes.Count - 1)
-            fretAssigner.MoveHandTo(next);
+            fretAssigner.MoveHandTo(next, note.Midi);
 
         RefreshTab();
     }
@@ -161,10 +261,18 @@ public partial class MainWindow
             return;
         }
 
+        string confidence = last.Confidence >= 0.75
+            ? "high confidence"
+            : last.Confidence >= 0.5
+                ? "medium confidence"
+                : "uncertain";
+        TabStringText.Text += $" · {confidence}";
+
         var others = FretAssigner.Positions(last.Midi, tuning.Strings).Where(p => p != last.Position).ToList();
-        TabAlternativesText.Text = others.Count == 0
+        string also = others.Count == 0
             ? "Only playable here"
             : "Also: " + string.Join("  ·  ", others.Select(p => $"{TabText.StringName(tuning.Strings, p.String)} fret {p.Fret}"));
+        TabAlternativesText.Text = last.Confidence < 0.5 ? "Uncertain — " + also : also;
     }
 
     /// <summary>Auto plus one entry per string, lowest string first, e.g. "String 6 (E)".</summary>

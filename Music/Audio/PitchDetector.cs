@@ -9,6 +9,11 @@ public sealed class PitchDetector
     // Lower = stricter: only clearly periodic sounds (like a plucked string) pass.
     private const double Threshold = 0.1;
 
+    /// <summary>Lowest and highest MIDI notes in the harmonic scan.</summary>
+    public const int SpectralLowMidi = 40;
+    public const int SpectralHighMidi = 88;
+    public const int SpectralScoreCount = SpectralHighMidi - SpectralLowMidi + 1;
+
     // Octave correction only kicks in when the chosen dip is not already clean, and a
     // longer period is clearly (OctaveCheckRatio times) more periodic.
     private const double OctaveCheckFloor = 0.02;
@@ -23,6 +28,9 @@ public sealed class PitchDetector
     private readonly int tauMin;
     private readonly int tauMax;
     private readonly float[] yin;
+    private readonly double[] hann;
+    private readonly double hannSum;
+    private readonly double[] spectralScores = new double[SpectralScoreCount];
 
     public PitchDetector(int sampleRate, int bufferSize, double minFrequency = 50, double maxFrequency = 1000)
     {
@@ -30,6 +38,12 @@ public sealed class PitchDetector
         tauMin = Math.Max(2, (int)(sampleRate / maxFrequency));
         tauMax = Math.Min(bufferSize / 2, (int)(sampleRate / minFrequency));
         yin = new float[tauMax + 1];
+
+        // Goertzel magnitudes share the same Hann window; precompute it once.
+        hann = new double[bufferSize];
+        for (int i = 0; i < bufferSize; i++)
+            hann[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (bufferSize - 1));
+        hannSum = hann.Sum();
     }
 
     /// <summary>Returns the detected frequency in Hz, or null if no clear pitch was found.</summary>
@@ -80,6 +94,76 @@ public sealed class PitchDetector
     }
 
     /// <summary>
+    /// A second, harmonic-summing estimate used only when a new pluck overlaps a ringing note.
+    /// YIN follows the strongest periodicity, so a loud old string can hide a new one; this scan
+    /// looks for the fundamental with the strongest harmonic support instead.
+    /// </summary>
+    public double? DetectSpectral(float[] buffer)
+    {
+        FillSpectralScores(buffer, spectralScores);
+
+        double bestScore = 0;
+        int bestIndex = -1;
+        for (int i = 0; i < spectralScores.Length; i++)
+        {
+            if (spectralScores[i] > bestScore)
+            {
+                bestScore = spectralScores[i];
+                bestIndex = i;
+            }
+        }
+
+        return bestScore > 1e-5
+            ? 440 * Math.Pow(2, (SpectralLowMidi + bestIndex - 69) / 12.0)
+            : null;
+    }
+
+    /// <summary>
+    /// Fills <paramref name="destination"/> with the harmonic-summing score for every note in the
+    /// guitar range. Comparing consecutive snapshots exposes a new pluck even when a loud old
+    /// string still has the highest absolute score.
+    /// </summary>
+    public void FillSpectralScores(float[] buffer, double[] destination)
+    {
+        if (destination.Length < SpectralScoreCount)
+            throw new ArgumentException("The destination is too short for the guitar range.", nameof(destination));
+
+        for (int index = 0; index < SpectralScoreCount; index++)
+        {
+            int midi = SpectralLowMidi + index;
+            double frequency = 440 * Math.Pow(2, (midi - 69) / 12.0);
+            double score = Magnitude(buffer, frequency);
+            score += 0.5 * Magnitude(buffer, 2 * frequency);
+            score += 0.33 * Magnitude(buffer, 3 * frequency);
+            score += 0.25 * Magnitude(buffer, 4 * frequency);
+            destination[index] = score;
+        }
+    }
+
+    /// <summary>
+    /// Average harmonic number of a detected note (1 = only the fundamental, 3 = mostly the third
+    /// harmonic). It is a cheap timbre clue: for the same pitch, a thinner string and a shorter
+    /// vibrating length usually put more energy into the upper harmonics.
+    /// </summary>
+    public double? HarmonicBrightness(float[] buffer, double frequency)
+    {
+        double weighted = 0;
+        double total = 0;
+        for (int harmonic = 1; harmonic <= 8; harmonic++)
+        {
+            double partial = frequency * harmonic;
+            if (partial >= sampleRate / 2.0)
+                break;
+
+            double magnitude = Magnitude(buffer, partial);
+            weighted += harmonic * magnitude;
+            total += magnitude;
+        }
+
+        return total > 1e-6 ? weighted / total : null;
+    }
+
+    /// <summary>
     /// YIN can lock onto two or three times the real period when a string's fundamental is weak.
     /// If the detected frequency has virtually no spectral energy but 2× or 3× it does, report the
     /// stronger partial instead. Two-times correction is only used below 80 Hz, so a genuinely
@@ -114,19 +198,20 @@ public sealed class PitchDetector
     /// <summary>Magnitude of one frequency in the buffer (Hann-windowed Goertzel).</summary>
     private double Magnitude(float[] buffer, double frequency)
     {
+        if (frequency >= sampleRate / 2.0)
+            return 0;
+
         double coefficient = 2 * Math.Cos(2 * Math.PI * frequency / sampleRate);
-        double s1 = 0, s2 = 0, windowSum = 0;
+        double s1 = 0, s2 = 0;
         for (int i = 0; i < buffer.Length; i++)
         {
-            double window = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (buffer.Length - 1));
-            double s0 = buffer[i] * window + coefficient * s1 - s2;
+            double s0 = buffer[i] * hann[i] + coefficient * s1 - s2;
             s2 = s1;
             s1 = s0;
-            windowSum += window;
         }
 
         double power = s1 * s1 + s2 * s2 - coefficient * s1 * s2;
-        return Math.Sqrt(Math.Max(0, power)) / Math.Max(1e-9, windowSum);
+        return Math.Sqrt(Math.Max(0, power)) / Math.Max(1e-9, hannSum);
     }
 
     /// <summary>

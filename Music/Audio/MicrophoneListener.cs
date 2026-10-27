@@ -2,7 +2,13 @@ using NAudio.Wave;
 
 namespace Music.Audio;
 
-public readonly record struct PitchReading(double? Frequency, double Level, double Gate);
+public readonly record struct PitchReading(
+    double? Frequency,
+    double Level,
+    double Gate,
+    double? SpectralFrequency = null,
+    double? Brightness = null,
+    double? SpectralBrightness = null);
 
 /// <summary>Newly captured samples plus the input level and current noise gate.</summary>
 public readonly record struct AudioBlock(float[] Samples, double Level, double Gate)
@@ -51,6 +57,12 @@ public sealed class MicrophoneListener : IDisposable
 
     /// <summary>How far above the background noise level a sound must be to be analysed.</summary>
     public double GateRatio { get; set; } = 4;
+
+    /// <summary>
+    /// When true, also computes a harmonic-summing pitch candidate. Tabs uses it to hear a new string
+    /// that is masked by a still-ringing old one; the tuner doesn't need the extra work.
+    /// </summary>
+    public bool DetectHarmonics { get; set; }
 
     /// <summary>
     /// Set by a <see cref="SamplesCaptured"/> handler (during the callback) when it recognises music in the
@@ -146,8 +158,15 @@ public sealed class MicrophoneListener : IDisposable
         if (PitchUpdated is { } pitchUpdated)
         {
             double? frequency = level >= gate ? detector.Detect(window) : null;
+            double? spectral = DetectHarmonics && level >= gate ? detector.DetectSpectral(window) : null;
+            double? brightness = DetectHarmonics && frequency is double f
+                ? detector.HarmonicBrightness(window, f)
+                : null;
+            double? spectralBrightness = DetectHarmonics && spectral is double sf
+                ? detector.HarmonicBrightness(window, sf)
+                : null;
             MusicPresent |= frequency is not null;
-            pitchUpdated(new PitchReading(frequency, level, gate));
+            pitchUpdated(new PitchReading(frequency, level, gate, spectral, brightness, spectralBrightness));
         }
 
         // ...but rise only slowly, and never while music is being heard. Otherwise continuous
