@@ -1,0 +1,47 @@
+name: Mobile app
+
+on:
+  push:
+    paths: ['Mobile/**', '.github/workflows/mobile.yml']
+  pull_request:
+    paths: ['Mobile/**', '.github/workflows/mobile.yml']
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: Mobile
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew && cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tuner-android-debug
+          path: Mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx cap sync ios
+      # Unsigned simulator build: proves the project compiles. Installing on an iPhone needs an Apple signing team.
+      - run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO build
