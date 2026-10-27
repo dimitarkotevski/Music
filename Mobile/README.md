@@ -5,6 +5,9 @@ wrapped as native apps with [Capacitor](https://capacitorjs.com/).
 
 ## Features
 
+- **Start menu**: **Tuner**, **Metronome** and **Exit**, like the desktop app. **← Menu** (or Android's back button)
+  returns to it and stops the tuner or metronome. Exit closes the app on Android; iOS and browsers don't let an app
+  close itself, so there it stops everything and shows a goodbye screen.
 - **Tuner**: the same YIN pitch detection, smoothing and auto string detection as the desktop tuner
   ([`pitch-detector.js`](www/js/pitch-detector.js) is a port of `Music/Audio/PitchDetector.cs`).
   Tap a string to lock onto it and hear its reference tone; A4 reference 415–466 Hz; sensitivity slider.
@@ -27,7 +30,7 @@ wrapped as native apps with [Capacitor](https://capacitorjs.com/).
 | `www/js/tuner.js` | Tuner screen: gauge, readout, strings, tuning list |
 | `www/js/tuning-editor.js` | Custom tuning sheet |
 | `www/js/metronome.js`, `metronome-view.js` | Click scheduler and metronome screen |
-| `www/js/app.js` | Tabs, microphone lifecycle, screen wake lock |
+| `www/js/app.js` | Start menu, Exit and Android back button, microphone lifecycle, screen wake lock |
 
 ## Try it in a browser
 

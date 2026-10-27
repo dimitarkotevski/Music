@@ -32,7 +32,7 @@ body {
 main {
   flex: 1;
   overflow-y: auto;
-  padding: calc(env(safe-area-inset-top) + 16px) max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
+  padding: calc(env(safe-area-inset-top) + 16px) max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 16px) max(16px, env(safe-area-inset-left));
 }
 
 .screen { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
@@ -136,7 +136,7 @@ select {
 input[type="range"] { accent-color: var(--accent); width: 100%; height: 32px; }
 
 /* Metronome */
-#metronome { --accent: var(--metronome); padding-top: 4vh; gap: 28px; }
+#metronome { --accent: var(--metronome); gap: 28px; }
 .bpm-row { display: flex; align-items: center; justify-content: space-between; }
 .bpm-display { text-align: center; }
 #bpm { font-size: 96px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -154,28 +154,23 @@ input[type="range"] { accent-color: var(--accent); width: 100%; height: 32px; }
 .metronome-button { padding: 20px; font-size: 22px; border-radius: 20px; }
 .metronome-button.stop { background: var(--stop); }
 
-/* Bottom tabs */
-.tabs {
-  display: flex;
-  background: var(--panel);
-  border-top: 1px solid var(--raised);
-  padding-bottom: env(safe-area-inset-bottom);
+/* Start menu */
+#menu, #goodbye { min-height: 100%; justify-content: center; align-items: stretch; gap: 14px; text-align: center; }
+.menu-icon { width: 96px; height: 96px; align-self: center; }
+#menu h1, #goodbye h1 { margin: 8px 0 0; font-size: 32px; }
+.menu-subtitle { margin: 0 0 18px; color: var(--dim); }
+.menu-button {
+  background: var(--raised);
+  border-radius: 16px;
+  padding: 18px;
+  font-size: 20px;
+  font-weight: 600;
 }
-.tab {
-  flex: 1;
-  background: none;
-  color: var(--dim);
-  padding: 8px 0 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 12px;
-}
-.tab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.tab[aria-selected="true"] { color: var(--text); }
-.tab[data-screen="tuner"][aria-selected="true"] { color: var(--accent); }
-.tab[data-screen="metronome"][aria-selected="true"] { color: var(--metronome); }
+.menu-button.tuner-color { background: var(--accent); }
+.menu-button.metronome-color { background: var(--metronome); }
+
+.screen-header { display: flex; align-items: center; gap: 12px; }
+.screen-header h2 { margin: 0; font-size: 20px; }
 
 /* Custom tuning sheet */
 dialog {

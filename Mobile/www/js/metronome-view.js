@@ -33,8 +33,14 @@ export function initMetronome() {
   $('start-stop').addEventListener('click', toggle);
 }
 
+export function stopMetronome() {
+  if (metronome.isRunning) {
+    metronome.stop();
+    updateStartStop();
+  }
+}
+
 async function toggle() {
-  const button = $('start-stop');
   if (metronome.isRunning) {
     metronome.stop();
   } else {
@@ -45,6 +51,11 @@ async function toggle() {
       return;
     }
   }
+  updateStartStop();
+}
+
+function updateStartStop() {
+  const button = $('start-stop');
   button.textContent = metronome.isRunning ? 'Stop' : 'Start';
   button.classList.toggle('stop', metronome.isRunning);
   document.dispatchEvent(new Event('metronomechange'));

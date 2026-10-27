@@ -1,20 +1,43 @@
-import { initMetronome, isMetronomeRunning } from './metronome-view.js';
+import { initMetronome, isMetronomeRunning, stopMetronome } from './metronome-view.js';
 import { initTuner, startListening, stopListening } from './tuner.js';
 import { initTuningEditor } from './tuning-editor.js';
-import { load, save } from './storage.js';
 
 const $ = id => document.getElementById(id);
 
-let screen = 'tuner';
+// Capacitor injects its bridge (and plugins such as App) only in the native apps.
+const capacitor = window.Capacitor;
+const platform = capacitor?.getPlatform?.() ?? 'web';
+const nativeApp = capacitor?.Plugins?.App;
+
+let screen = 'menu';
 let wakeLock = null;
 
 initTuner();
 initTuningEditor();
 initMetronome();
 
-for (const tab of document.querySelectorAll('.tab'))
-  tab.addEventListener('click', () => showScreen(tab.dataset.screen));
-showScreen(load('screen', 'tuner'));
+for (const button of document.querySelectorAll('[data-open]'))
+  button.addEventListener('click', () => showScreen(button.dataset.open));
+for (const button of document.querySelectorAll('.back'))
+  button.addEventListener('click', () => showScreen('menu'));
+
+// Only Android lets an app close itself. iOS and a browser tab can't, so Exit stops everything and says goodbye.
+$('exit').addEventListener('click', () => {
+  if (platform === 'android' && nativeApp)
+    nativeApp.exitApp();
+  else
+    showScreen('goodbye');
+});
+
+// Android's back button returns to the menu, and from the menu leaves the app.
+nativeApp?.addListener('backButton', () => {
+  if ($('editor').open)
+    $('editor').close();
+  else if (screen !== 'menu')
+    showScreen('menu');
+  else
+    nativeApp.exitApp();
+});
 
 // The microphone only runs while the tuner is on screen and the app is in front.
 document.addEventListener('visibilitychange', () => {
@@ -28,16 +51,18 @@ document.addEventListener('metronomechange', updateWakeLock);
 
 function showScreen(name) {
   screen = name;
-  save('screen', name);
-  for (const tab of document.querySelectorAll('.tab'))
-    tab.setAttribute('aria-selected', tab.dataset.screen === name);
-  $('tuner').hidden = name !== 'tuner';
-  $('metronome').hidden = name !== 'metronome';
+  for (const id of ['menu', 'tuner', 'metronome', 'goodbye'])
+    $(id).hidden = id !== name;
 
+  // Like the desktop app, going back to the menu stops whatever was running.
   if (name === 'tuner')
     startListening();
   else
     stopListening();
+  if (name !== 'metronome')
+    stopMetronome();
+
+  $('main').scrollTop = 0;
   updateWakeLock();
 }
 

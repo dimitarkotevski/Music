@@ -13,8 +13,28 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
-    <section id="tuner" class="screen" data-state="idle" aria-label="Tuner">
+  <main id="main">
+    <section id="menu" class="screen" aria-label="Menu">
+      <img src="icon.svg" alt="" class="menu-icon">
+      <h1>Tuner &amp; Metronome</h1>
+      <p class="menu-subtitle">Choose an option</p>
+      <button class="menu-button tuner-color" data-open="tuner">Tuner</button>
+      <button class="menu-button metronome-color" data-open="metronome">Metronome</button>
+      <button id="exit" class="menu-button">Exit</button>
+    </section>
+
+    <section id="goodbye" class="screen" aria-label="Exited" hidden>
+      <img src="icon.svg" alt="" class="menu-icon">
+      <h1>Goodbye!</h1>
+      <p class="menu-subtitle">Everything is stopped. You can close the app now.</p>
+      <button class="back menu-button">Back to menu</button>
+    </section>
+
+    <section id="tuner" class="screen" data-state="idle" aria-label="Tuner" hidden>
+      <div class="screen-header">
+        <button class="back chip" aria-label="Back to menu">← Menu</button>
+        <h2>Tuner</h2>
+      </div>
       <div class="row">
         <select id="tuning-select" aria-label="Tuning"></select>
         <button id="edit-tuning" class="chip" hidden>Edit</button>
@@ -58,6 +78,10 @@
     </section>
 
     <section id="metronome" class="screen" aria-label="Metronome" hidden>
+      <div class="screen-header">
+        <button class="back chip" aria-label="Back to menu">← Menu</button>
+        <h2>Metronome</h2>
+      </div>
       <div class="bpm-row">
         <button id="bpm-down" class="round big" aria-label="Slower">−</button>
         <div class="bpm-display">
@@ -81,17 +105,6 @@
       <button id="start-stop" class="primary metronome-button">Start</button>
     </section>
   </main>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab" role="tab" data-screen="tuner">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 1 1 16 0M12 18l4-7"/></svg>
-      Tuner
-    </button>
-    <button class="tab" role="tab" data-screen="metronome">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l4 18H5zM12 17l5-9"/></svg>
-      Metronome
-    </button>
-  </nav>
 
   <dialog id="editor">
     <form id="editor-form">
