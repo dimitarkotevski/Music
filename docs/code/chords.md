@@ -36,16 +36,18 @@ Chord recognition. Analysis is in [Music/Chords/](../../Music/Chords/); the scre
 Called every 50 ms with the new samples, **on the audio thread**.
 
 1. **`Append`**: slide a 16384-sample window (`FftSize`, about 0.37 s, about 2.7 Hz resolution).
-2. If below the noise gate: fade the chroma, clear the chord, return.
-3. **`ComputeChroma`**:
-   - Hann window + FFT (`NAudio.Dsp.FastFourierTransform`).
+2. **`DetectOnset`**: a block `OnsetRatio` (1.8×) louder than the recent level is a new strum. From then on only the audio since the strum is analysed, until the window is full again, so the previous chord doesn't blend into the new one. Analysis waits for `MinOnsetSamples` (4096, about 93 ms) after a strum.
+3. If below the noise gate: fade the chroma, clear the chord, return.
+4. **`ComputeChroma`**:
+   - Hann window fitted to the analysed length (zero-padded) + FFT (`NAudio.Dsp.FastFourierTransform`).
    - Find spectral peaks between `MinFrequency`–`MaxFrequency` (70–1400 Hz) above `PeakFloor` (5% of the loudest), with parabolic interpolation.
    - Drop peaks more than `MaxCentsOff` (35 cents) from a semitone.
    - Add √magnitude to that peak's pitch class, ×`OvertoneWeight` (0.35) if **`IsOvertone`**: a 3rd, 5th, 6th or 7th harmonic of a lower peak, unless the same note also appears an octave or two lower.
+   - Remember the lowest frequency heard for each pitch class (`lowestPeak`).
    - **`FindBass`**: score every note from D2 to B3 (`LowestBassMidi`, `BassCandidateCount`) by its harmonic series. A candidate needs some energy at its own fundamental, which rules out phantom octaves below. Pick the lowest one with ≥ `BassSupportRatio` (0.75) of the best score, or a loud fundamental (`StrongFundamental`).
-4. **Smoothing**: average with the previous chroma (50/50).
-5. **`Match`**: cosine similarity between the chroma and every chord type × 12 roots, + `Prior`, + `BassBonus` (0.04) if the root is the bass. Rejected below `MinConfidence` (0.8).
-6. **`UpdateStability`**: the same chord must win `StableFramesRequired` (3) times in a row before it's reported.
+5. **Smoothing**: average with the previous chroma (50/50), restarted after each strum.
+6. **`Match`**: cosine similarity between the chroma and every chord type × 12 roots, + `Prior`, + `BassBonus` (0.04) if the root is the bass, − `BassOutsidePenalty` (0.06) if the bass isn't in the chord (this separates Cmaj7 from Em and Am7 from C), − `ThirdPenalty` × the louder third for power and sus chords. Rejected below `MinConfidence` (0.8). A slash chord is reported only when the root isn't heard below the bass note.
+7. **`UpdateStability`**: the same chord must win `StableFramesRequired` (3) times in a row before it's reported.
 
 Returns `ChordAnalysis(Chord?, Confidence, Chroma[12])`.
 
@@ -57,7 +59,8 @@ Returns `ChordAnalysis(Chord?, Confidence, Chroma[12])`.
 | Misses chords / shows "–" too often | Lower `MinConfidence` or `PeakFloor` |
 | Adds 7ths that aren't played | Lower `OvertoneWeight`, raise the 7th chords' `Prior` penalty |
 | Wrong slash chords | `FindBass`: `BassSupportRatio`, `StrongFundamental` |
-| Too slow to react | `StableFramesRequired`, the smoothing in `Process` |
+| Too slow to react | `StableFramesRequired`, `MinOnsetSamples`, the smoothing in `Process` |
+| Power/sus chords shown for major/minor (or the reverse) | `ThirdPenalty` |
 
 Accuracy was measured with simulated chords (22 voicings × 10 tries): about 98% on a normal mic or in heavy noise, about 93% on a weak-bass laptop mic. That test harness isn't in the repo.
 

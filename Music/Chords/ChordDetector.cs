@@ -29,6 +29,13 @@ public sealed class ChordDetector
     private const int BassCandidateCount = 22; // up to B3
     private const double BassSupportRatio = 0.75;
     private const double StrongFundamental = 0.35;
+    private const double BassOutsidePenalty = 0.06;
+    private const double ThirdPenalty = 0.25;
+
+    // A strum is a block this much louder than the recent level. The analysis then only looks at audio
+    // since the strum (at least MinOnsetSamples), so the previous chord doesn't blend into the new one.
+    private const double OnsetRatio = 1.8;
+    private const int MinOnsetSamples = 4096;
     private static readonly int[] OddHarmonics = [3, 5, 6, 7];
 
     private readonly int sampleRate;
@@ -37,11 +44,14 @@ public sealed class ChordDetector
     private readonly Complex[] fft = new Complex[FftSize];
     private readonly double[] magnitudes = new double[FftSize / 2];
     private readonly double[] smoothedChroma = new double[12];
+    private readonly double[] lowestPeak = new double[12];
 
     private Chord? candidate;
     private int candidateFrames;
     private Chord? stableChord;
     private double stableConfidence;
+    private double recentLevel;
+    private int samplesSinceOnset = FftSize;
 
     public ChordDetector(int sampleRate)
     {
@@ -58,12 +68,15 @@ public sealed class ChordDetector
         Array.Clear(smoothedChroma);
         candidate = stableChord = null;
         candidateFrames = 0;
+        recentLevel = 0;
+        samplesSinceOnset = FftSize;
     }
 
     /// <summary>Feeds newly captured samples. <paramref name="hasSignal"/> is false when the input is below the noise gate.</summary>
     public ChordAnalysis Process(float[] samples, bool hasSignal)
     {
         Append(samples);
+        bool onset = DetectOnset(samples);
 
         if (!hasSignal)
         {
@@ -74,12 +87,18 @@ public sealed class ChordDetector
             return new ChordAnalysis(null, 0, (double[])smoothedChroma.Clone());
         }
 
+        // Right after a strum there is too little new audio to analyse; keep showing the previous result.
+        if (samplesSinceOnset < MinOnsetSamples)
+            return new ChordAnalysis(stableChord, stableChord is null ? 0 : stableConfidence, (double[])smoothedChroma.Clone());
+
+        // The first analysis after a strum starts the smoothing afresh.
         var (chroma, bass) = ComputeChroma();
+        double keep = samplesSinceOnset - samples.Length < MinOnsetSamples ? 0 : 0.5;
         for (int i = 0; i < 12; i++)
-            smoothedChroma[i] = 0.5 * smoothedChroma[i] + 0.5 * chroma[i];
+            smoothedChroma[i] = keep * smoothedChroma[i] + (1 - keep) * chroma[i];
         Normalize(smoothedChroma);
 
-        var (best, confidence) = Match(smoothedChroma, bass);
+        var (best, confidence) = Match(smoothedChroma, bass, lowestPeak);
         UpdateStability(best, confidence);
         return new ChordAnalysis(stableChord, stableChord is null ? 0 : stableConfidence, (double[])smoothedChroma.Clone());
     }
@@ -91,11 +110,31 @@ public sealed class ChordDetector
         Array.Copy(samples, samples.Length - count, window, FftSize - count, count);
     }
 
-    private (double[] Chroma, int? Bass) ComputeChroma()
+    /// <summary>Tracks the input level and restarts the analysis window when a new strum starts.</summary>
+    private bool DetectOnset(float[] samples)
     {
+        double sumSquares = 0;
+        foreach (float sample in samples)
+            sumSquares += sample * sample;
+        double level = Math.Sqrt(sumSquares / Math.Max(1, samples.Length));
+
+        bool onset = level > recentLevel * OnsetRatio && level > 1e-3;
+        recentLevel = onset ? level : Math.Max(level, 0.7 * recentLevel + 0.3 * level);
+        samplesSinceOnset = onset ? samples.Length : Math.Min(FftSize, samplesSinceOnset + samples.Length);
+        return onset;
+    }
+
+    private (double[] Chroma, Bass? Bass) ComputeChroma()
+    {
+        // Only the audio since the last strum is analysed, with a Hann window fitted to that length.
+        int length = samplesSinceOnset;
+        int start = FftSize - length;
         for (int i = 0; i < FftSize; i++)
         {
-            fft[i].X = window[i] * hann[i];
+            double weight = i < start ? 0
+                : length == FftSize ? hann[i]
+                : 0.5 - 0.5 * Math.Cos(2 * Math.PI * (i - start) / (length - 1));
+            fft[i].X = (float)(window[i] * weight);
             fft[i].Y = 0;
         }
 
@@ -133,8 +172,12 @@ public sealed class ChordDetector
         }
 
         var chroma = new double[12];
+        Array.Fill(lowestPeak, double.MaxValue);
         foreach (var peak in peaks)
+        {
             chroma[peak.PitchClass] += Math.Sqrt(peak.Magnitude) * (IsOvertone(peak.Frequency, peak.Magnitude, peaks) ? OvertoneWeight : 1);
+            lowestPeak[peak.PitchClass] = Math.Min(lowestPeak[peak.PitchClass], peak.Frequency);
+        }
 
         Normalize(chroma);
         return (chroma, FindBass(peaks));
@@ -172,7 +215,7 @@ public sealed class ChordDetector
     /// Finds the bass pitch class from whole harmonic series rather than the lowest peak, because cheap
     /// microphones barely pick up the fundamentals of the low strings.
     /// </summary>
-    private int? FindBass(List<(double Frequency, double Magnitude, int PitchClass)> peaks)
+    private Bass? FindBass(List<(double Frequency, double Magnitude, int PitchClass)> peaks)
     {
         if (peaks.Count == 0)
             return null;
@@ -201,7 +244,7 @@ public sealed class ChordDetector
         for (int i = 0; i < BassCandidateCount; i++)
         {
             if (scores[i] >= best * BassSupportRatio || fundamentals[i] >= StrongFundamental)
-                return (LowestBassMidi + i) % 12;
+                return new Bass((LowestBassMidi + i) % 12, NoteMath.MidiToFrequency(LowestBassMidi + i, A4));
         }
 
         return null;
@@ -219,7 +262,12 @@ public sealed class ChordDetector
         return strongest;
     }
 
-    private static (Chord? Chord, double Confidence) Match(double[] chroma, int? bass)
+    /// <summary>
+    /// Picks the best chord template. The bass note favours chords that contain it, and a power or sus chord
+    /// loses out when a third is clearly heard.
+    /// </summary>
+    /// <param name="lowestPeak">Lowest frequency heard for each pitch class.</param>
+    private static (Chord? Chord, double Confidence) Match(double[] chroma, Bass? bass, double[] lowestPeak)
     {
         double chromaNorm = Math.Sqrt(chroma.Sum(v => v * v));
         if (chromaNorm == 0)
@@ -237,13 +285,24 @@ public sealed class ChordDetector
                     dot += chroma[(root + interval) % 12];
 
                 double similarity = dot / (chromaNorm * templateNorm);
-                double score = similarity + quality.Prior + (bass == root ? BassBonus : 0);
+                double score = similarity + quality.Prior;
+                bool bassInChord = bass is Bass b && quality.Intervals.Any(i => (root + i) % 12 == b.PitchClass);
+                if (bass?.PitchClass == root)
+                    score += BassBonus;
+                else if (bass is not null && !bassInChord)
+                    score -= BassOutsidePenalty;
+                if (!quality.Intervals.Contains(3) && !quality.Intervals.Contains(4))
+                    score -= ThirdPenalty * Math.Max(chroma[(root + 3) % 12], chroma[(root + 4) % 12]);
+
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestSimilarity = similarity;
-                    bool inversion = bass is int b && b != root && quality.Intervals.Any(i => (root + i) % 12 == b);
-                    best = new Chord(root, quality, inversion ? bass : null);
+
+                    // An inversion only when the root really isn't sounding below the bass note.
+                    bool inversion = bass is Bass heard && bassInChord && heard.PitchClass != root
+                        && lowestPeak[root] > heard.Frequency * 0.97;
+                    best = new Chord(root, quality, inversion ? bass!.Value.PitchClass : null);
                 }
             }
         }
@@ -283,3 +342,6 @@ public sealed class ChordDetector
             values[i] /= max;
     }
 }
+
+/// <summary>The detected bass note: its pitch class and the frequency it was heard at.</summary>
+internal readonly record struct Bass(int PitchClass, double Frequency);
