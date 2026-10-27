@@ -46,6 +46,43 @@ Latency from pluck to tab is about 0.35–0.45 s (right-edge margin + confirmati
 
 **String and fret.** `FretboardArranger.ArrangeNext(previous, notes, tuning)` is one step of the Songs arranger's Viterbi search: every playable voicing of the column is scored with the same voicing cost (fret height, span, open strings) plus the transition from the column already on the tab (hand movement, string distance). The previous column is read back from `tabNotes`, so a note the player moved by clicking steers the next one. Confidence is the margin to the second-best voicing. A string lock bypasses this: the loudest note playable on that string goes through `AddTabNote` as before.
 
+## Editing by hand and the fingering memory
+
+**Editing.** Clicking a string at a column (`TabStaff.CellClicked`) selects that cell (`tabCell`, outlined in white). While a cell is selected, `HandleTabCellKey` takes the keys before the string shortcuts:
+
+| Key | Effect |
+|---|---|
+| `0`–`9` | Sets the fret on that string. Two digits within a second make a two-digit fret (`1` `2` = 12). In a single-note column the note moves there and takes the new pitch, which also fixes a wrong note; in a chord the string is set, or a note is added if it was empty (`SetTabCell`) |
+| `Delete` / `Backspace` | Removes the note on that string (`DeleteTabCell`) |
+| Arrows | Move the selection (Up = the next higher string) |
+| `Esc` | Deselects; the next `Esc` goes back to the menu |
+
+Clicking the selected note again still moves it to the next string with the same pitch. Edited notes get `TabNote.Edited`, so nothing automatic changes them afterwards.
+
+**Save tab** (`SaveTab_Click`) stores the tab as the player's answer, under one id per take (`tabTakeId`, new after **Clear**), so saving again replaces it:
+
+- `Desktop\GuitarTabsTest\training\saved-tabs\<take>.txt`: the text tab.
+- `fingerings.json`: every column with its strings and frets, for `FingeringMemory`.
+- `string-sounds.json`: single notes whose heard pitch still matches (`TabNote.Heard`) become `StringSoundExample`s, so corrected tabs also train the string sound model.
+
+**FingeringMemory.** Each saved column is indexed by its pitches together with the pitches of up to three columns before it (`MaxContext`). For a new AI column, `Find` looks for the longest matching passage and returns a `MemoryMatch`: for each pitch, how often each position was chosen there. `Cost` adds `weight × −ln share` to `ArrangeNext`, with the weight growing with the match length (0.4 for the pitches alone, up to 2.5 with three earlier columns), so one familiar note only nudges, while a familiar passage overrules hand-position habits. Once at least two earlier columns match, `ApplyToRecent` also moves those just-written columns to the saved fingering; notes the player edited are left alone. Notes placed from memory have `Remembered` set, and the detail line says **From your saved tabs**.
+
+## String training
+
+A microphone hears pitch, not strings: open A and low E fret 5 are the same note. What differs is the sound, and that differs per guitar and mic, so it is learned from the player instead of built in.
+
+| File | Contents |
+|---|---|
+| [Tabs/TrainingPhrases.cs](../../Music/Tabs/TrainingPhrases.cs) | The phrases, generated from the tuning: open strings, the same notes on neighbouring strings and two strings apart, and each string up the neck |
+| [Tabs/StringTimbreModel.cs](../../Music/Tabs/StringTimbreModel.cs) | `StringTimbreModel` (nearest-neighbour model of each string's sound) and `StringSoundExample` |
+| [MainWindow.Training.cs](../../Music/MainWindow.Training.cs) | The **Train** overlay |
+
+**Flow.** **Train** shows a phrase on a `TabStaff` with the next note highlighted (`HighlightIndex`). While training runs, `AddTabColumn` hands every AI column to `TrainingColumn` instead of the tab. A note that matches the asked pitch (or the one after it, if the detector missed one) is labelled with the asked string/fret, together with `LiveNoteModel.SoundProfile`: harmonics 2–10 relative to the fundamental (searched slightly sharp for wound-string inharmonicity), the average harmonic number, and the decay over 100 ms. Examples are saved after every phrase to `Desktop\GuitarTabsTest\training\string-sounds.json`, with a WAV of the session next to it.
+
+**Model.** For a new note, each candidate string is scored by the mean distance (standardised features) to its 3 closest training notes within ±3 semitones, recorded in the same open-string pitch. Scores become probabilities with a sharpness fitted on the training data (`temperature`, by maximum leave-one-out likelihood).
+
+**Honest weight.** `Retrain` hides each note in turn and asks the model which string it was on (`Accuracy`), against a blind guess between the same strings (`Chance`). `Weight = 2 × (Accuracy − Chance) / (1 − Chance)`, and 0 below 20 testable notes. `StringSoundCost` adds `Weight × −ln p` per position to `ArrangeNext` for single notes (chords blur each other's sound). A model that cannot beat guessing therefore has no effect. The summary after training says which case applies.
+
 ## Classic pipeline
 
 ```

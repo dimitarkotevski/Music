@@ -33,6 +33,14 @@ public partial class MainWindow
     private bool useAiTabs;
     private double lastTabColumnStart;
 
+    // Hand editing: a selected (column, string) cell takes typed fret numbers. Saved tabs teach the
+    // fingering memory and the string sound model; the take id lets a second save replace the first.
+    private readonly FingeringMemory fingerings = FingeringMemory.Load(FingeringMemory.DefaultPath);
+    private (int Column, int String)? tabCell;
+    private int? typedFret;
+    private DateTime typedFretTime;
+    private string tabTakeId = NewTakeId();
+
     // Temporary live-input diagnostic: lets us see whether the microphone, the pitch
     // detector, or the note tracker is where a second string gets lost.
     private readonly object tabDebugLock = new();
@@ -78,7 +86,7 @@ public partial class MainWindow
             Dispatcher.BeginInvoke(() => ShowTabInput(reading, note));
         };
 
-        TabStaffView.NoteClicked += MoveTabNoteToNextString;
+        TabStaffView.CellClicked += TabCellClicked;
         tabListener.DetectHarmonics = true;
         TabTuningBox.ItemsSource = GuitarTuning.All;
         TabTuningBox.SelectedItem = tuning;
@@ -123,7 +131,10 @@ public partial class MainWindow
         TabView.IsVisibleChanged += (_, _) =>
         {
             if (!TabView.IsVisible)
+            {
+                StopTraining();
                 liveNotes?.Stop();
+            }
         };
 
         TabEngineBox.ItemsSource = liveNotes is null
@@ -298,6 +309,12 @@ public partial class MainWindow
         if (!useAiTabs || TabView.Visibility != Visibility.Visible || column.Count == 0)
             return;
 
+        if (trainRunning)
+        {
+            TrainingColumn(column);
+            return;
+        }
+
         // A locked string can only hold one note at a time: keep the loudest one it can play.
         if (tabStringLock is int locked)
         {
@@ -310,7 +327,23 @@ public partial class MainWindow
         }
 
         var previous = LastTabColumn();
-        if (liveArranger.ArrangeNext(previous, column, tuning.Strings, FretAssigner.MaxFret) is not SongTabColumn placed)
+        double[]? profile = column.Count == 1 ? liveNotes?.SoundProfile(column[0].Start, column[0].Midi) : null;
+        var soundCost = StringSoundCost(column, profile);
+
+        // A passage the player saved before: prefer the fingering they chose there.
+        var memory = fingerings.Find(
+            TabText.Columns(tabNotes).TakeLast(FingeringMemory.MaxContext).Select(c => (IReadOnlyCollection<int>)c.Select(n => n.Midi).ToList()).ToList(),
+            column.Select(n => n.Midi).ToList(),
+            tuning.Strings);
+        Func<int, FretPosition, double>? positionCost = (soundCost, memory) switch
+        {
+            (null, null) => null,
+            (_, null) => soundCost,
+            (null, _) => memory.Cost,
+            _ => (midi, position) => soundCost!(midi, position) + memory.Cost(midi, position),
+        };
+
+        if (liveArranger.ArrangeNext(previous, column, tuning.Strings, FretAssigner.MaxFret, positionCost: positionCost) is not SongTabColumn placed)
         {
             LogTabDebug("ui drop column (no playable shape)");
             return;
@@ -321,24 +354,48 @@ public partial class MainWindow
         lastTabNoteTime = now;
         lastTabColumnStart = placed.Start;
 
+        bool remembered = memory is { ContextLength: >= 1 } && placed.Notes.All(n => memory.IsUsual(n.Midi, n.Position));
         for (int i = 0; i < placed.Notes.Count; i++)
         {
             var note = placed.Notes[i];
             tabNotes.Add(new TabNote(note.Midi, note.Position, gap && i == 0)
             {
-                Confidence = placed.Confidence,
+                Confidence = remembered ? Math.Max(placed.Confidence, 0.9) : placed.Confidence,
                 ChordWithPrevious = i > 0,
+                Heard = profile is not null && placed.Notes.Count == 1 ? new HeardSound(note.Midi, profile) : null,
+                Remembered = remembered,
             });
         }
+
+        // Recognised a saved passage: the notes just before it get the player's fingering as well.
+        if (remembered && FingeringMemory.ApplyToRecent(tabNotes, memory!) is int moved and > 0)
+            LogTabDebug($"memory: recognised a saved passage, moved {moved} earlier notes");
 
         // Keep the classic assigner in step, so switching detectors carries on from the same hand position.
         var top = placed.Notes[^1];
         fretAssigner.MoveHandTo(top.Position, top.Midi);
 
         LogTabDebug("ui add column " + string.Join(" ", placed.Notes.Select(n => $"{DebugNote(n.Midi)}=s{n.Position.String + 1}f{n.Position.Fret}"))
-            + $" confidence={placed.Confidence:0.00}");
+            + $" confidence={placed.Confidence:0.00} memory={(memory is null ? "-" : memory.ContextLength.ToString())} remembered={remembered}");
         RefreshTab();
         TabScroll.ScrollToEnd();
+    }
+
+    /// <summary>
+    /// For a single note, how unlikely each string is given how the note sounded, from string training.
+    /// Null for chords (their notes blur each other's sound) or while the model has not proven itself.
+    /// </summary>
+    private Func<int, FretPosition, double>? StringSoundCost(IReadOnlyList<TranscribedNote> column, double[]? profile)
+    {
+        if (column.Count != 1 || stringSounds.Weight <= 0 || profile is null
+            || stringSounds.Probabilities(column[0].Midi, profile, tuning.Strings) is not { } probabilities)
+            return null;
+
+        LogTabDebug("sound " + string.Join(" ", probabilities.Select(p => $"s{tuning.Strings.Length - p.Key}={p.Value:0.00}")));
+        double weight = stringSounds.Weight;
+        return (_, position) => probabilities.TryGetValue(position.String, out double p)
+            ? weight * -Math.Log(Math.Max(0.02, p))
+            : 0;
     }
 
     /// <summary>The last written column as the arranger sees it, including any string the player moved by hand.</summary>
@@ -358,6 +415,195 @@ public partial class MainWindow
         while (index > 0 && tabNotes[index].ChordWithPrevious)
             index--;
         return index;
+    }
+
+    private static string NewTakeId() => "take-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+
+    /// <summary>First note index and note count of a column (as numbered by <see cref="TabText.Columns"/>).</summary>
+    private (int Start, int Count)? TabColumnRange(int column)
+    {
+        int ordinal = -1;
+        for (int i = 0; i < tabNotes.Count; i++)
+        {
+            if (i > 0 && tabNotes[i].ChordWithPrevious)
+                continue;
+            if (++ordinal != column)
+                continue;
+
+            int count = 1;
+            while (i + count < tabNotes.Count && tabNotes[i + count].ChordWithPrevious)
+                count++;
+            return (i, count);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Click on a string at a column: select that cell, so typed digits set its fret. Clicking the
+    /// selected note again moves it to the next string with the same pitch, as before.
+    /// </summary>
+    private void TabCellClicked(int column, int stringIndex)
+    {
+        if (TabColumnRange(column) is not (int start, int count))
+            return;
+
+        int noteIndex = Enumerable.Range(start, count).FirstOrDefault(i => tabNotes[i].Position.String == stringIndex, -1);
+        if (tabCell == (column, stringIndex) && noteIndex >= 0)
+        {
+            MoveTabNoteToNextString(noteIndex);
+            tabCell = (column, tabNotes[noteIndex].Position.String);
+        }
+        else
+        {
+            tabCell = (column, stringIndex);
+        }
+
+        typedFret = null;
+        RefreshTab();
+    }
+
+    /// <summary>Keys while a cell is selected: digits set the fret, Delete removes, arrows move, Esc deselects.</summary>
+    private bool HandleTabCellKey(Key key)
+    {
+        if (tabCell is not (int column, int stringIndex) || TabColumnRange(column) is null)
+            return false;
+
+        int digit = key switch
+        {
+            >= Key.D0 and <= Key.D9 => key - Key.D0,
+            >= Key.NumPad0 and <= Key.NumPad9 => key - Key.NumPad0,
+            _ => -1,
+        };
+        if (digit >= 0)
+        {
+            // Two quick digits make a two-digit fret (1 then 2 = fret 12).
+            int fret = typedFret is int first && DateTime.UtcNow - typedFretTime < TimeSpan.FromSeconds(1)
+                && first * 10 + digit <= FretAssigner.MaxFret
+                    ? first * 10 + digit
+                    : digit;
+            typedFret = fret < 10 ? fret : null;
+            typedFretTime = DateTime.UtcNow;
+            SetTabCell(column, stringIndex, fret);
+            return true;
+        }
+
+        int columns = TabText.Columns(tabNotes).Count;
+        switch (key)
+        {
+            case Key.Delete or Key.Back:
+                DeleteTabCell(column, stringIndex);
+                return true;
+            case Key.Escape:
+                tabCell = null;
+                break;
+            case Key.Left:
+                tabCell = (Math.Max(0, column - 1), stringIndex);
+                break;
+            case Key.Right:
+                tabCell = (Math.Min(columns - 1, column + 1), stringIndex);
+                break;
+            case Key.Up:
+                tabCell = (column, Math.Min(tuning.Strings.Length - 1, stringIndex + 1));
+                break;
+            case Key.Down:
+                tabCell = (column, Math.Max(0, stringIndex - 1));
+                break;
+            default:
+                return false;
+        }
+
+        typedFret = null;
+        RefreshTab();
+        return true;
+    }
+
+    /// <summary>
+    /// Writes a fret on a string. In a single-note column the note moves there (and takes the new pitch,
+    /// which also fixes a wrong note); in a chord the string is set, adding a note if it was empty.
+    /// </summary>
+    private void SetTabCell(int column, int stringIndex, int fret)
+    {
+        if (TabColumnRange(column) is not (int start, int count))
+            return;
+
+        int midi = tuning.Strings[stringIndex] + fret;
+        var position = new FretPosition(stringIndex, fret);
+        int onString = Enumerable.Range(start, count).FirstOrDefault(i => tabNotes[i].Position.String == stringIndex, -1);
+        int target = onString >= 0 ? onString : count == 1 ? start : -1;
+
+        if (target >= 0)
+            tabNotes[target] = tabNotes[target] with { Midi = midi, Position = position, Confidence = 1, Remembered = false, Edited = true };
+        else
+            tabNotes.Insert(start + count, new TabNote(midi, position, GapBefore: false) { ChordWithPrevious = true, Edited = true });
+
+        // Editing the latest column also tells the classic assigner where the hand is.
+        if (start + count >= tabNotes.Count - 1)
+            fretAssigner.MoveHandTo(position, midi);
+        LogTabDebug($"edit column={column + 1} string={tuning.Strings.Length - stringIndex} fret={fret}");
+        RefreshTab();
+    }
+
+    private void DeleteTabCell(int column, int stringIndex)
+    {
+        if (TabColumnRange(column) is not (int start, int count))
+            return;
+
+        int index = Enumerable.Range(start, count).FirstOrDefault(i => tabNotes[i].Position.String == stringIndex, -1);
+        if (index < 0)
+            return;
+
+        // The column's first note carries the pause marker; the next note takes over if it goes.
+        if (index == start && count > 1)
+            tabNotes[start + 1] = tabNotes[start + 1] with { ChordWithPrevious = false, GapBefore = tabNotes[start].GapBefore };
+        tabNotes.RemoveAt(index);
+
+        int remaining = TabText.Columns(tabNotes).Count;
+        if (count == 1)
+            tabCell = remaining == 0 ? null : (Math.Min(column, remaining - 1), stringIndex);
+        typedFret = null;
+        RefreshTab();
+    }
+
+    /// <summary>
+    /// Saves the tab as it is now, as the player's answer: a text copy for reading, the fingerings for
+    /// <see cref="FingeringMemory"/>, and single notes with their sound for string training.
+    /// </summary>
+    private void SaveTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (tabNotes.Count == 0)
+            return;
+
+        try
+        {
+            var columns = TabText.Columns(tabNotes);
+            fingerings.Add(new SavedTab(tabTakeId, DateTime.Now, tuning.Strings.ToArray(),
+                columns.Select(c => c.Select(n => new SavedTabNote(n.Midi, n.Position.String, n.Position.Fret)).ToList()).ToList()));
+            fingerings.Save(FingeringMemory.DefaultPath);
+
+            // A note whose pitch was corrected by hand no longer matches the sound that was heard.
+            var sounds = columns
+                .Where(c => c.Count == 1 && c[0].Heard is { } heard && heard.Midi == c[0].Midi)
+                .Select(c => new StringSoundExample(c[0].Midi, c[0].Position.String, c[0].Position.Fret,
+                    tuning.Strings[c[0].Position.String], c[0].Heard!.Profile, tabTakeId, 0))
+                .ToList();
+            stringSounds.ReplaceSession(tabTakeId, sounds);
+            stringSounds.Save(StringTimbreModel.DefaultPath);
+
+            string folder = Path.Combine(Path.GetDirectoryName(FingeringMemory.DefaultPath)!, "saved-tabs");
+            Directory.CreateDirectory(folder);
+            string textPath = Path.Combine(folder, tabTakeId + ".txt");
+            File.WriteAllText(textPath, TabText.Format(tabNotes, tuning.Strings));
+
+            TabStringText.Text = "Tab saved";
+            TabFretText.Text = $"{columns.Count} columns remembered · {fingerings.TabCount} saved tabs";
+            TabAlternativesText.Text = "When you play this again, your fingering is used. Saved to " + textPath;
+        }
+        catch (Exception ex)
+        {
+            TabStringText.Text = "Could not save the tab";
+            TabFretText.Text = ex.Message;
+        }
     }
 
     /// <summary>Click on a note: move it to the next string where the same pitch can be played.</summary>
@@ -384,6 +630,8 @@ public partial class MainWindow
         var next = positions[(current + 1) % positions.Count];
         tabNotes[index] = note with { Position = next, Confidence = 1 };
 
+        tabNotes[index] = tabNotes[index] with { Remembered = false, Edited = true };
+
         // Moving the latest note also tells the assigner where the hand is for the next notes.
         if (index == tabNotes.Count - 1)
             fretAssigner.MoveHandTo(next, note.Midi);
@@ -396,8 +644,11 @@ public partial class MainWindow
         noteTracker.LowestMidi = tuning.Strings.Min();
         noteTracker.HighestMidi = tuning.Strings.Max() + FretAssigner.MaxFret;
 
+        if (tabCell is (int selectedColumn, _) && TabColumnRange(selectedColumn) is null)
+            tabCell = null;
         TabStaffView.Notes = tabNotes;
         TabStaffView.Tuning = tuning.Strings;
+        TabStaffView.SelectedCell = tabCell;
         TabStaffView.Refresh();
 
         if (tabNotes.Count == 0)
@@ -445,7 +696,9 @@ public partial class MainWindow
         string also = others.Count == 0
             ? "Only playable here"
             : "Also: " + string.Join("  ·  ", others.Select(p => $"{TabText.StringName(tuning.Strings, p.String)} fret {p.Fret}"));
-        TabAlternativesText.Text = last.Confidence < 0.5 ? "Uncertain — " + also : also;
+        TabAlternativesText.Text = last.Remembered
+            ? "From your saved tabs · " + also
+            : last.Confidence < 0.5 ? "Uncertain — " + also : also;
     }
 
     /// <summary>A chord: its notes, and the shape from the low string up (x = not played), e.g. "x 0 2 2 1 0".</summary>
@@ -522,12 +775,20 @@ public partial class MainWindow
     /// <summary>Keys 6–1 lock the matching guitar string; 0 returns to Auto.</summary>
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (TabView.Visibility != Visibility.Visible || TabTestPanel.Visibility == Visibility.Visible)
+        if (TabView.Visibility != Visibility.Visible || TabTestPanel.Visibility == Visibility.Visible
+            || TrainPanel.Visibility == Visibility.Visible)
             return;
         if (Keyboard.Modifiers != ModifierKeys.None)
             return;
         if (Keyboard.FocusedElement is ComboBox { IsDropDownOpen: true })
             return;
+
+        // With a cell selected, digits are fret numbers instead of string shortcuts.
+        if (HandleTabCellKey(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
 
         int number = e.Key switch
         {
@@ -592,6 +853,8 @@ public partial class MainWindow
     {
         tabNotes.Clear();
         fretAssigner.Reset();
+        tabCell = null;
+        tabTakeId = NewTakeId();
         RefreshTab();
     }
 

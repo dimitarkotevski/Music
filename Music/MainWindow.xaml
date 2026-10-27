@@ -374,11 +374,17 @@
                 </Border>
 
                 <DockPanel Grid.Row="2" Margin="0,14,0,8" LastChildFill="False">
-                    <TextBlock Text="Click a note to move it to another string" Foreground="#6C7389" FontSize="12"
-                               VerticalAlignment="Center" />
+                    <TextBlock Text="Click a string at a note, type the fret · Del removes · Save teaches the app your fingering"
+                               Foreground="#6C7389" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300" />
+                    <Button DockPanel.Dock="Right" Content="Train" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="StartTraining_Click"
+                            ToolTip="Play short tab phrases so the app learns how each string of your guitar sounds" />
                     <Button DockPanel.Dock="Right" Content="Guided test" Style="{StaticResource SmallButton}" Width="94"
                             Height="30" FontSize="13" Margin="8,0,0,0" Click="StartTabTest_Click"
                             ToolTip="The app names notes one by one and records you playing them" />
+                    <Button DockPanel.Dock="Right" Content="Save tab" Style="{StaticResource SmallButton}" Width="80"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="SaveTab_Click"
+                            ToolTip="Save this tab as correct. The app remembers your fingering and uses it when you play this again" />
                     <Button DockPanel.Dock="Right" Content="Copy tab" Style="{StaticResource SmallButton}" Width="86"
                             Height="30" FontSize="13" Margin="8,0,0,0" Click="CopyTab_Click"
                             ToolTip="Copy the tab as text, ready to paste anywhere" />
@@ -400,6 +406,49 @@
                                  BorderThickness="0"
                                  ToolTip="Grey = treated as background noise, amber = loud enough to be analysed" />
                 </DockPanel>
+
+                <!-- Training overlay: shows a tab phrase, labels each note heard, learns the string sounds -->
+                <Border x:Name="TrainPanel" Grid.RowSpan="5" Panel.ZIndex="11" Background="#E615171E"
+                        Visibility="Collapsed">
+                    <Border Background="#232733" CornerRadius="18" Padding="30,26" Width="520"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#3A4050" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock x:Name="TrainTitle" Text="STRING TRAINING" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="#F59E0B" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TrainPhraseText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock x:Name="TrainNoteText" Text="…" FontSize="64" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            <TextBlock x:Name="TrainInstructionText" Text="Get ready" FontSize="20"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <Border Background="#1B1E27" CornerRadius="10" Padding="4,4" Margin="0,12,0,0">
+                                <controls:TabStaff x:Name="TrainStaff" Height="150" IsHitTestVisible="False"
+                                                   HighlightBrush="#F59E0B" />
+                            </Border>
+                            <TextBlock x:Name="TrainProgressText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <TextBlock x:Name="TrainStatusText" Text="" FontSize="12" Foreground="#6C7389"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Margin="0,10,0,0" />
+                            <TextBlock x:Name="TrainHintText" FontSize="12" Foreground="#6C7389" HorizontalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Text="Play the highlighted note exactly where the tab shows it, let it sound for a moment, then mute it. The next note lights up when the app has heard it." />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+                                <Button x:Name="TrainSkipButton" Content="Skip phrase" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="SkipTrainingPhrase_Click" ToolTip="Go to the next phrase; notes already heard are kept" />
+                                <Button x:Name="TrainFinishButton" Content="Finish" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="FinishTraining_Click" ToolTip="Stop and learn from everything played so far" />
+                                <Button x:Name="TrainFolderButton" Content="Open folder" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13"
+                                        Click="OpenTrainingFolder_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Border>
 
                 <!-- Guided test overlay: names each note and records the take -->
                 <Border x:Name="TabTestPanel" Grid.RowSpan="5" Panel.ZIndex="10" Background="#E615171E"
