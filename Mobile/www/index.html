@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#14161d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Tuner &amp; Metronome</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section id="tuner" class="screen" data-state="idle" aria-label="Tuner">
+      <div class="row">
+        <select id="tuning-select" aria-label="Tuning"></select>
+        <button id="edit-tuning" class="chip" hidden>Edit</button>
+        <button id="new-tuning" class="chip">+ Custom</button>
+      </div>
+
+      <svg id="gauge" viewBox="0 0 320 190" aria-hidden="true">
+        <g id="needle">
+          <line x1="160" y1="170" x2="160" y2="42"></line>
+          <circle cx="160" cy="170" r="7"></circle>
+        </g>
+      </svg>
+
+      <div class="readout" aria-live="polite">
+        <div id="note">–</div>
+        <div id="hint">Play a string</div>
+        <div id="cents">&nbsp;</div>
+        <div id="frequency">&nbsp;</div>
+      </div>
+
+      <button id="mic-start" class="primary">Start tuner</button>
+
+      <div class="strings-row">
+        <button id="auto-button" class="string-button auto active" aria-label="Detect the string automatically">Auto</button>
+        <div id="strings"></div>
+      </div>
+
+      <div class="level" aria-hidden="true"><div id="level-fill"></div></div>
+
+      <div class="settings">
+        <div class="stepper">
+          <button id="a4-down" class="round" aria-label="Lower reference pitch">−</button>
+          <span id="a4-value">A4 = 440 Hz</span>
+          <button id="a4-up" class="round" aria-label="Raise reference pitch">+</button>
+        </div>
+        <label class="slider">
+          <span>Sensitivity</span>
+          <input id="sensitivity" type="range" min="0" max="1" step="0.05">
+        </label>
+      </div>
+    </section>
+
+    <section id="metronome" class="screen" aria-label="Metronome" hidden>
+      <div class="bpm-row">
+        <button id="bpm-down" class="round big" aria-label="Slower">−</button>
+        <div class="bpm-display">
+          <div id="bpm">120</div>
+          <div class="bpm-unit">BPM · <span id="tempo-name">Allegro</span></div>
+        </div>
+        <button id="bpm-up" class="round big" aria-label="Faster">+</button>
+      </div>
+
+      <input id="bpm-slider" type="range" aria-label="Tempo">
+
+      <div id="beats" aria-hidden="true"></div>
+
+      <div class="row center">
+        <label class="signature">Time
+          <select id="signature"></select>
+        </label>
+        <button id="tap" class="chip big">Tap tempo</button>
+      </div>
+
+      <button id="start-stop" class="primary metronome-button">Start</button>
+    </section>
+  </main>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-screen="tuner">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a8 8 0 1 1 16 0M12 18l4-7"/></svg>
+      Tuner
+    </button>
+    <button class="tab" role="tab" data-screen="metronome">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l4 18H5zM12 17l5-9"/></svg>
+      Metronome
+    </button>
+  </nav>
+
+  <dialog id="editor">
+    <form id="editor-form">
+      <h2 id="editor-title">New tuning</h2>
+      <input id="editor-name" maxlength="30" autocomplete="off" aria-label="Tuning name">
+
+      <div class="editor-tools">
+        <span id="editor-count">6 strings</span>
+        <button type="button" id="editor-remove" class="chip">− String</button>
+        <button type="button" id="editor-add" class="chip">+ String</button>
+      </div>
+      <div class="editor-tools">
+        <span>All strings</span>
+        <button type="button" id="editor-whole" class="chip">−1 tone</button>
+        <button type="button" id="editor-half" class="chip">−½</button>
+        <button type="button" id="editor-half-up" class="chip">+½</button>
+      </div>
+
+      <p class="editor-help">Tap a note to hear it. String 1 is the thinnest.</p>
+      <ol id="editor-strings"></ol>
+
+      <div class="editor-actions">
+        <button type="button" id="editor-delete" class="danger">Delete</button>
+        <button type="button" id="editor-cancel" class="chip big">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
