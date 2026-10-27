@@ -12,6 +12,9 @@ namespace Music;
 public partial class MainWindow : Window
 {
     private const double InTuneCents = 5;
+
+    // Once green, the reading must drift this much further before it turns orange again, so it doesn't flicker.
+    private const double InTuneHysteresisCents = 2;
     private const double GaugeRangeCents = 50;
     private const double GaugeSweepDegrees = 60;
     private const double GaugeCenterX = 160, GaugeCenterY = 170, GaugeRadius = 140;
@@ -20,12 +23,23 @@ public partial class MainWindow : Window
     private static readonly TimeSpan HoldTime = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan NewNoteGap = TimeSpan.FromSeconds(0.25);
 
-    // A pitch must hold steady (within StableCents) for this many readings (~50 ms each) before it is shown.
+    // Readings arrive every TunerBlockMilliseconds; short blocks keep the needle live.
+    private const int TunerBlockMilliseconds = 25;
+
+    // A pitch must hold steady (within StableCents) for this many readings before it is shown.
     private const int StableReadingsRequired = 3;
     private const double StableCents = 40;
 
+    // Each reading moves the shown pitch this fraction of the way to the new one (about 60 ms to settle).
+    // A jump larger than NewPitchCents is a new note or a quick peg turn, so the pitch snaps instead.
+    private const double PitchSmoothing = 0.35;
+    private const double NewPitchCents = 50;
+
+    // The needle glides towards the reading every frame with this time constant.
+    private const double NeedleTimeConstantSeconds = 0.06;
+
     // In auto mode a note keeps its string unless another string is heard for this many readings in a row.
-    private const int StringSwitchReadings = 5;
+    private const int StringSwitchReadings = 10;
 
     private static readonly Brush NeutralBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE6, 0xE8, 0xEF)));
     private static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0xA0, 0xB4)));
@@ -35,7 +49,7 @@ public partial class MainWindow : Window
     private static readonly Brush ActiveStringBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x5B, 0x8C, 0xFF)));
     private static readonly Brush LevelGatedBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x4A, 0x50, 0x66)));
 
-    private readonly MicrophoneListener listener = new();
+    private readonly MicrophoneListener listener = new(bufferMilliseconds: TunerBlockMilliseconds);
     private readonly TonePlayer tonePlayer = new();
     private readonly List<double> recentFrequencies = [];
     private readonly List<Button> stringButtons = [];
@@ -44,6 +58,10 @@ public partial class MainWindow : Window
     private double a4 = 440;
     private int? manualString;
     private double needleCents;
+    private double needleTarget;
+    private DateTime lastNeedleFrame = DateTime.UtcNow;
+    private double? smoothedFrequency;
+    private bool inTune;
     private DateTime lastPitchTime = DateTime.MinValue;
     private double? lastRawFrequency;
     private int stableReadings;
@@ -54,6 +72,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DrawGauge();
+        CompositionTarget.Rendering += AnimateNeedle;
 
         listener.PitchUpdated += reading => Dispatcher.BeginInvoke(() => OnPitch(reading));
 
@@ -82,6 +101,7 @@ public partial class MainWindow : Window
             if (now - lastPitchTime > NewNoteGap)
             {
                 recentFrequencies.Clear();
+                smoothedFrequency = null;
                 autoString = null;
             }
             if (now - lastPitchTime > HoldTime)
@@ -89,11 +109,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        // A median of three drops single bad readings; the easing then removes the jitter without the lag
+        // of a long median.
         lastPitchTime = now;
         recentFrequencies.Add(frequency);
-        if (recentFrequencies.Count > 5)
+        if (recentFrequencies.Count > 3)
             recentFrequencies.RemoveAt(0);
-        double smoothed = Median(recentFrequencies);
+        double median = Median(recentFrequencies);
+        double smoothed = smoothedFrequency is double previous && Math.Abs(NoteMath.Cents(median, previous)) < NewPitchCents
+            ? previous * Math.Pow(median / previous, PitchSmoothing)
+            : median;
+        smoothedFrequency = smoothed;
 
         int stringIndex = manualString ?? AutoDetectString(smoothed);
         int targetMidi = tuning.Strings[stringIndex];
@@ -104,7 +130,7 @@ public partial class MainWindow : Window
         CentsText.Text = $"{cents:+0;-0;0} cents";
         FrequencyText.Text = $"{smoothed:F1} Hz  ·  hearing {NoteMath.Name(detectedMidi)}{NoteMath.Octave(detectedMidi)}";
 
-        bool inTune = Math.Abs(cents) <= InTuneCents;
+        inTune = Math.Abs(cents) <= InTuneCents + (inTune ? InTuneHysteresisCents : 0);
         Brush stateBrush = inTune ? InTuneBrush : OffBrush;
         HintText.Text = inTune ? "In tune ✓" : cents < 0 ? "Tune up ↑" : "Tune down ↓";
         HintText.Foreground = stateBrush;
@@ -137,13 +163,23 @@ public partial class MainWindow : Window
         CentsText.Text = " ";
         FrequencyText.Text = " ";
         Needle.Stroke = NeutralBrush;
+        inTune = false;
         MoveNeedle(0);
         HighlightString(manualString ?? -1);
     }
 
-    private void MoveNeedle(double targetCents)
+    private void MoveNeedle(double targetCents) => needleTarget = targetCents;
+
+    /// <summary>Runs every frame so the needle glides between readings instead of jumping.</summary>
+    private void AnimateNeedle(object? sender, EventArgs e)
     {
-        needleCents += 0.35 * (targetCents - needleCents);
+        DateTime now = DateTime.UtcNow;
+        double elapsed = Math.Clamp((now - lastNeedleFrame).TotalSeconds, 0, 0.1);
+        lastNeedleFrame = now;
+        if (TunerView.Visibility != Visibility.Visible)
+            return;
+
+        needleCents += (needleTarget - needleCents) * (1 - Math.Exp(-elapsed / NeedleTimeConstantSeconds));
         NeedleRotate.Angle = needleCents / GaugeRangeCents * GaugeSweepDegrees;
     }
 
