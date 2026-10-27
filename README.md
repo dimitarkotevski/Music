@@ -21,6 +21,10 @@ A GuitarTuna-style guitar tuner for Windows PC. It listens to your microphone, d
 - **Adjustable reference pitch:** A4 from 415 to 466 Hz (default 440 Hz).
 - **Microphone selection** and an input level meter (grey = ignored as noise, blue = being analysed).
 
+## Mobile app
+
+The tuner (with custom tunings) and metronome are also available as an Android and iOS app in [`Mobile/`](Mobile/README.md).
+
 ## Requirements
 
 - Windows 10 or 11
