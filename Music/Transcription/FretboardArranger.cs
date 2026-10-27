@@ -129,6 +129,68 @@ public sealed class FretboardArranger
         return new ArrangementResult(columns, dropped, unplayable);
     }
 
+    /// <summary>
+    /// Live version of <see cref="Arrange"/>: places one new column right after the column already written.
+    /// Earlier columns are never revised, so this is the single next step of the same search, with the
+    /// same voicing and hand-movement costs.
+    /// </summary>
+    /// <param name="previous">The last column on the tab (as the player may have corrected it), or null.</param>
+    public SongTabColumn? ArrangeNext(
+        SongTabColumn? previous,
+        IReadOnlyList<TranscribedNote> notes,
+        int[] tuning,
+        int maxFret = DefaultMaxFret,
+        ArrangementMode mode = ArrangementMode.Chords)
+    {
+        int lowest = tuning.Min();
+        int highest = tuning.Max() + maxFret;
+        var group = CleanGroup(notes.Where(n => n.Midi >= lowest && n.Midi <= highest).ToList());
+        if (mode == ArrangementMode.Solo && group.Count > 1)
+            group = [group.OrderByDescending(n => n.Amplitude).First()];
+        if (group.Count == 0)
+            return null;
+
+        var voicings = BuildVoicings(group, tuning, maxFret);
+
+        // More notes than one hand can hold (an overtone the model kept, or a ringing string): keep the
+        // loudest notes that still make a playable shape.
+        while (voicings.Count == 0 && group.Count > 1)
+        {
+            group = group.OrderByDescending(n => n.Amplitude).Take(group.Count - 1).OrderBy(n => n.Midi).ToList();
+            voicings = BuildVoicings(group, tuning, maxFret);
+        }
+
+        if (voicings.Count == 0)
+            return null;
+
+        Voicing? before = null;
+        if (previous is { Notes.Count: > 0 })
+        {
+            var previousNotes = previous.Notes
+                .Select(n => new TranscribedNote(n.Start, n.End, n.Midi))
+                .ToList();
+            before = MakeVoicing(previousNotes, previous.Notes.Select(n => n.Position).ToArray())
+                ?? new Voicing(previousNotes, previous.Notes.Select(n => n.Position).ToArray(), 0,
+                    previous.Notes.Where(n => n.Position.Fret > 0).Select(n => n.Position.Fret).DefaultIfEmpty(0).Min(),
+                    previous.Notes.Max(n => n.Position.Fret), previous.Notes.Count(n => n.Position.Fret == 0), previous.Start);
+        }
+
+        var scored = voicings
+            .Select(v => (Voicing: v, Cost: v.Cost + (before is null ? 0 : Transition(before, v, v.Start - before.Start))))
+            .OrderBy(x => x.Cost)
+            .ToList();
+
+        var best = scored[0];
+        double confidence = scored.Count == 1
+            ? 1
+            : Math.Clamp(1 - Math.Exp(-Math.Max(0, scored[1].Cost - best.Cost) / 0.7), 0, 1);
+
+        var arranged = best.Voicing.Notes
+            .Select((note, i) => new ArrangedNote(note.Midi, best.Voicing.Positions[i], note.Start, note.End))
+            .ToList();
+        return new SongTabColumn(best.Voicing.Start, arranged, confidence);
+    }
+
     private static List<TranscribedNote> MergeSustainedFragments(List<TranscribedNote> notes)
     {
         var merged = new List<TranscribedNote>();

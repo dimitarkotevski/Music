@@ -72,12 +72,17 @@ public sealed class TabStaff : FrameworkElement
             dc.DrawLine(new Pen(LineBrush, 2), new Point(LabelWidth, StringY(top, Tuning.Length - 1)), new Point(LabelWidth, StringY(top, 0)));
         }
 
+        // The whole latest column is highlighted, so a just-played chord stands out.
+        int lastColumnStart = Notes.Count - 1;
+        while (lastColumnStart > 0 && Notes[lastColumnStart].ChordWithPrevious)
+            lastColumnStart--;
+
         foreach (var (row, slot, index) in slots)
         {
             var note = Notes[index];
             double top = PaddingTop + row * RowHeight;
             var center = new Point(LabelWidth + (slot + 0.5) * SlotWidth, StringY(top, note.Position.String));
-            bool highlighted = index == Notes.Count - 1;
+            bool highlighted = index >= lastColumnStart;
 
             var text = MakeText(note.Position.Fret.ToString(CultureInfo.InvariantCulture), Font, 14, highlighted ? Brushes.White : TextBrush);
             var bounds = new Rect(center.X - Math.Max(9, text.Width / 2 + 4), center.Y - 9, Math.Max(18, text.Width + 8), 18);
@@ -119,7 +124,7 @@ public sealed class TabStaff : FrameworkElement
         return null;
     }
 
-    /// <summary>Row and slot for every note. A note after a pause gets an empty slot before it.</summary>
+    /// <summary>Row and slot for every note. A note after a pause gets an empty slot before it; chord notes share a slot.</summary>
     private List<(int Row, int Slot, int Index)> Layout(double width)
     {
         int slotsPerRow = Math.Max(4, (int)((width - LabelWidth - PaddingRight) / SlotWidth));
@@ -127,6 +132,14 @@ public sealed class TabStaff : FrameworkElement
         int position = 0;
         for (int i = 0; i < Notes.Count; i++)
         {
+            // A chord's notes share the slot of the first one.
+            if (Notes[i].ChordWithPrevious && i > 0)
+            {
+                int shared = position - 1;
+                result.Add((shared / slotsPerRow, shared % slotsPerRow, i));
+                continue;
+            }
+
             if (Notes[i].GapBefore && position % slotsPerRow != 0)
                 position++;
             result.Add((position / slotsPerRow, position % slotsPerRow, i));

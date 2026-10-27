@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Music.Audio;
 using Music.Tabs;
+using Music.Transcription;
 using Music.Tuning;
 
 namespace Music;
@@ -24,6 +25,13 @@ public partial class MainWindow
     private readonly List<TabNote> tabNotes = [];
     private DateTime lastTabNoteTime = DateTime.MinValue;
     private int? tabStringLock;
+
+    // AI detector: Basic Pitch hears every note, the arranger places each new column on the neck.
+    private readonly FretboardArranger liveArranger = new();
+    private BasicPitchModel? basicPitch;
+    private LiveNoteModel? liveNotes;
+    private bool useAiTabs;
+    private double lastTabColumnStart;
 
     // Temporary live-input diagnostic: lets us see whether the microphone, the pitch
     // detector, or the note tracker is where a second string gets lost.
@@ -45,9 +53,18 @@ public partial class MainWindow
 
     private void InitializeTabs()
     {
+        InitializeAiTabs();
+
         // Note tracking runs on the audio thread; only finished notes go to the UI.
         tabListener.PitchUpdated += reading =>
         {
+            if (useAiTabs)
+            {
+                // The AI detector takes the raw samples instead; this reading only drives the level bar.
+                Dispatcher.BeginInvoke(() => ShowTabInput(reading, null));
+                return;
+            }
+
             var note = noteTracker.Process(
                 reading.Frequency,
                 reading.Level,
@@ -71,6 +88,62 @@ public partial class MainWindow
         RefreshTab();
     }
 
+    private void InitializeAiTabs()
+    {
+        try
+        {
+            if (BasicPitchModel.DefaultPath is string path)
+            {
+                basicPitch = new BasicPitchModel(path);
+                liveNotes = new LiveNoteModel(basicPitch);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine("Basic Pitch could not be loaded: " + ex.Message);
+            basicPitch = null;
+            liveNotes = null;
+        }
+
+        if (liveNotes is not null)
+        {
+            tabListener.SamplesCaptured += block =>
+            {
+                if (useAiTabs)
+                    liveNotes.AddSamples(block.Samples, block.Gate);
+            };
+            liveNotes.ColumnDetected += column =>
+            {
+                LogTabDebug("ai column=" + string.Join("+", column.Select(n => $"{DebugNote(n.Midi)}({n.Amplitude:0.00})")));
+                Dispatcher.BeginInvoke(() => AddTabColumn(column));
+            };
+        }
+
+        // The AI detector runs its own thread; stop it whenever the Tabs screen is left.
+        TabView.IsVisibleChanged += (_, _) =>
+        {
+            if (!TabView.IsVisible)
+                liveNotes?.Stop();
+        };
+
+        TabEngineBox.ItemsSource = liveNotes is null
+            ? new[] { "Classic (AI model missing)" }
+            : new[] { "AI — chords and ringing strings", "Classic — one note at a time" };
+        TabEngineBox.SelectedIndex = 0;
+    }
+
+    private void TabEngineBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        bool ai = liveNotes is not null && TabEngineBox.SelectedIndex == 0;
+        if (ai == useAiTabs)
+            return;
+
+        useAiTabs = ai;
+        RefreshTab();
+        if (TabView.Visibility == Visibility.Visible)
+            StartTabListening();
+    }
+
     private void StartTabs_Click(object sender, RoutedEventArgs e)
     {
         StartMenu.Visibility = Visibility.Collapsed;
@@ -92,6 +165,15 @@ public partial class MainWindow
             noteTracker.Reset();
             tabListener.GateRatio = listener.GateRatio;
             StartTabDebugLog();
+            LogTabDebug("detector=" + (useAiTabs ? "ai" : "classic"));
+            liveNotes?.Stop();
+            if (useAiTabs && liveNotes is not null)
+            {
+                liveNotes.LowestMidi = tuning.Strings.Min();
+                liveNotes.HighestMidi = tuning.Strings.Max() + FretAssigner.MaxFret;
+                liveNotes.Start();
+            }
+
             tabListener.Start(TabDeviceBox.SelectedIndex);
         }
         catch (Exception ex)
@@ -210,15 +292,95 @@ public partial class MainWindow
         TabScroll.ScrollToEnd();
     }
 
+    /// <summary>Writes the notes the AI detector heard together as one tab column.</summary>
+    private void AddTabColumn(IReadOnlyList<TranscribedNote> column)
+    {
+        if (!useAiTabs || TabView.Visibility != Visibility.Visible || column.Count == 0)
+            return;
+
+        // A locked string can only hold one note at a time: keep the loudest one it can play.
+        if (tabStringLock is int locked)
+        {
+            var playable = column
+                .Where(n => n.Midi - tuning.Strings[locked] is >= 0 and <= FretAssigner.MaxFret)
+                .OrderByDescending(n => n.Amplitude)
+                .FirstOrDefault();
+            AddTabNote((playable ?? column.OrderByDescending(n => n.Amplitude).First()).Midi);
+            return;
+        }
+
+        var previous = LastTabColumn();
+        if (liveArranger.ArrangeNext(previous, column, tuning.Strings, FretAssigner.MaxFret) is not SongTabColumn placed)
+        {
+            LogTabDebug("ui drop column (no playable shape)");
+            return;
+        }
+
+        DateTime now = DateTime.UtcNow;
+        bool gap = tabNotes.Count > 0 && now - lastTabNoteTime > TabGap;
+        lastTabNoteTime = now;
+        lastTabColumnStart = placed.Start;
+
+        for (int i = 0; i < placed.Notes.Count; i++)
+        {
+            var note = placed.Notes[i];
+            tabNotes.Add(new TabNote(note.Midi, note.Position, gap && i == 0)
+            {
+                Confidence = placed.Confidence,
+                ChordWithPrevious = i > 0,
+            });
+        }
+
+        // Keep the classic assigner in step, so switching detectors carries on from the same hand position.
+        var top = placed.Notes[^1];
+        fretAssigner.MoveHandTo(top.Position, top.Midi);
+
+        LogTabDebug("ui add column " + string.Join(" ", placed.Notes.Select(n => $"{DebugNote(n.Midi)}=s{n.Position.String + 1}f{n.Position.Fret}"))
+            + $" confidence={placed.Confidence:0.00}");
+        RefreshTab();
+        TabScroll.ScrollToEnd();
+    }
+
+    /// <summary>The last written column as the arranger sees it, including any string the player moved by hand.</summary>
+    private SongTabColumn? LastTabColumn()
+    {
+        if (tabNotes.Count == 0)
+            return null;
+
+        var last = TabText.Columns(tabNotes)[^1];
+        var notes = last.Select(n => new ArrangedNote(n.Midi, n.Position, lastTabColumnStart, lastTabColumnStart)).ToList();
+        return new SongTabColumn(lastTabColumnStart, notes, last[0].Confidence);
+    }
+
+    /// <summary>Index of the first note of the column that contains <paramref name="index"/>.</summary>
+    private int TabColumnStart(int index)
+    {
+        while (index > 0 && tabNotes[index].ChordWithPrevious)
+            index--;
+        return index;
+    }
+
     /// <summary>Click on a note: move it to the next string where the same pitch can be played.</summary>
     private void MoveTabNoteToNextString(int index)
     {
         var note = tabNotes[index];
-        var positions = FretAssigner.Positions(note.Midi, tuning.Strings);
+
+        // In a chord, every note needs its own string.
+        int first = TabColumnStart(index);
+        var usedByChord = new HashSet<int>();
+        for (int i = first; i < tabNotes.Count && (i == first || tabNotes[i].ChordWithPrevious); i++)
+        {
+            if (i != index)
+                usedByChord.Add(tabNotes[i].Position.String);
+        }
+
+        var positions = FretAssigner.Positions(note.Midi, tuning.Strings)
+            .Where(p => p == note.Position || !usedByChord.Contains(p.String))
+            .ToList();
         if (positions.Count < 2)
             return;
 
-        int current = positions.ToList().FindIndex(p => p == note.Position);
+        int current = positions.FindIndex(p => p == note.Position);
         var next = positions[(current + 1) % positions.Count];
         tabNotes[index] = note with { Position = next, Confidence = 1 };
 
@@ -241,12 +403,23 @@ public partial class MainWindow
         if (tabNotes.Count == 0)
         {
             TabNoteText.Text = "–";
-            TabStringText.Text = "Play one note at a time";
-            TabFretText.Text = "Mute the previous string before the next note";
+            TabNoteText.FontSize = 56;
+            TabStringText.Text = useAiTabs ? "Play normally" : "Play one note at a time";
+            TabFretText.Text = useAiTabs
+                ? "Ringing strings and chords are fine"
+                : "Mute the previous string before the next note";
             TabAlternativesText.Text = " ";
             return;
         }
 
+        var lastColumn = TabText.Columns(tabNotes)[^1];
+        if (lastColumn.Count > 1)
+        {
+            ShowTabChord(lastColumn);
+            return;
+        }
+
+        TabNoteText.FontSize = 56;
         var last = tabNotes[^1];
         TabNoteText.Text = NoteMath.Name(last.Midi) + NoteMath.Octave(last.Midi);
         TabStringText.Text = TabText.StringName(tuning.Strings, last.Position.String);
@@ -273,6 +446,19 @@ public partial class MainWindow
             ? "Only playable here"
             : "Also: " + string.Join("  ·  ", others.Select(p => $"{TabText.StringName(tuning.Strings, p.String)} fret {p.Fret}"));
         TabAlternativesText.Text = last.Confidence < 0.5 ? "Uncertain — " + also : also;
+    }
+
+    /// <summary>A chord: its notes, and the shape from the low string up (x = not played), e.g. "x 0 2 2 1 0".</summary>
+    private void ShowTabChord(IReadOnlyList<TabNote> chord)
+    {
+        TabNoteText.FontSize = chord.Count > 3 ? 26 : 34;
+        TabNoteText.Text = string.Join(" ", chord.OrderBy(n => n.Midi).Select(n => NoteMath.Name(n.Midi)));
+        TabStringText.Text = $"Chord · {chord.Count} notes";
+        TabFretText.Text = string.Join(" ", Enumerable.Range(0, tuning.Strings.Length)
+            .Select(s => chord.FirstOrDefault(n => n.Position.String == s) is TabNote n ? n.Position.Fret.ToString() : "x"));
+        TabAlternativesText.Text = chord[0].Confidence < 0.5
+            ? "Uncertain shape — click a note to move it to another string"
+            : "Click a note to move it to another string";
     }
 
     /// <summary>Auto plus one entry per string, lowest string first, e.g. "String 6 (E)".</summary>
@@ -379,6 +565,11 @@ public partial class MainWindow
         {
             for (int i = 0; i < tabNotes.Count; i++)
             {
+                // A chord cannot move onto one string.
+                bool inChord = tabNotes[i].ChordWithPrevious || (i + 1 < tabNotes.Count && tabNotes[i + 1].ChordWithPrevious);
+                if (inChord)
+                    continue;
+
                 int fret = tabNotes[i].Midi - tuning.Strings[locked];
                 if (fret is >= 0 and <= FretAssigner.MaxFret)
                     tabNotes[i] = tabNotes[i] with { Position = new FretPosition(locked, fret) };
@@ -391,8 +582,9 @@ public partial class MainWindow
 
     private void UndoTab_Click(object sender, RoutedEventArgs e)
     {
+        // A chord is undone as one column.
         if (tabNotes.Count > 0)
-            tabNotes.RemoveAt(tabNotes.Count - 1);
+            tabNotes.RemoveRange(TabColumnStart(tabNotes.Count - 1), tabNotes.Count - TabColumnStart(tabNotes.Count - 1));
         RefreshTab();
     }
 

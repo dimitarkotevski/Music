@@ -10,10 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Models\basic-pitch.onnx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Models\basic-pitch-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="tools\basic_pitch_worker.py" CopyToOutputDirectory="PreserveNewest" Link="tools\basic_pitch_worker.py" />
     <None Include="tools\requirements-transcription.txt" CopyToOutputDirectory="PreserveNewest" Link="tools\requirements-transcription.txt" />
     <None Include="tools\setup-transcription.ps1" CopyToOutputDirectory="PreserveNewest" Link="tools\setup-transcription.ps1" />

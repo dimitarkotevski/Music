@@ -4,15 +4,49 @@
 
 Writes every note you play as guitar tablature, including which string it's on. Logic is in [Music/Tabs/](../../Music/Tabs/); the screen is in [MainWindow.Tabs.cs](../../Music/MainWindow.Tabs.cs).
 
+There are two detectors, chosen in the **Detector** box: **AI** (default) runs Spotify's Basic Pitch neural network in-process and hears chords and notes over ringing strings; **Classic** is the original one-note-at-a-time YIN pipeline, kept for comparison and as the fallback when the model file is missing.
+
 | File | Contents |
 |---|---|
+| [Transcription/BasicPitchModel.cs](../../Music/Transcription/BasicPitchModel.cs) | `BasicPitchModel`: runs `Models/basic-pitch.onnx` through ONNX Runtime (2 s of 22.05 kHz audio → 172 frames × 88 keys of note and onset activations) |
+| [Tabs/LiveNoteModel.cs](../../Music/Tabs/LiveNoteModel.cs) | `LiveNoteModel`: streams microphone blocks through the model and decodes notes causally; raises `ColumnDetected` with the notes that started together |
+| [Transcription/FretboardArranger.cs](../../Music/Transcription/FretboardArranger.cs) | `ArrangeNext`: places each new AI column on the neck (shared with the Songs screen's `Arrange`) |
 | [Tabs/NoteTracker.cs](../../Music/Tabs/NoteTracker.cs) | `NoteTracker`: pitch readings → one `DetectedNote` per played note |
 | [Tabs/FretAssigner.cs](../../Music/Tabs/FretAssigner.cs) | `FretAssigner`: picks the string/fret; `FretPosition` |
 | [Tabs/TabNote.cs](../../Music/Tabs/TabNote.cs) | `TabNote` (a written note) and `TabText` (plain-text tab, string labels/names) |
 | [Controls/TabStaff.cs](../../Music/Controls/TabStaff.cs) | `TabStaff`: draws the tab, raises `NoteClicked` |
 | [MainWindow.Tabs.cs](../../Music/MainWindow.Tabs.cs) | Tabs screen UI |
 
-## Pipeline
+## AI pipeline
+
+```
+tabListener.SamplesCaptured (audio thread) ─► LiveNoteModel.AddSamples (44.1 → 22.05 kHz, 2 s ring buffer)
+  └─ worker thread, every 9 frames (~104 ms): BasicPitchModel.Predict(latest 2 s) ─► stitched note/onset timeline
+        └─ decode ─► ColumnDetected ─► Dispatcher ─► AddTabColumn ─► FretboardArranger.ArrangeNext ─► tabNotes ─► TabStaff
+```
+
+`PitchUpdated` still runs in AI mode, but only for the level bar.
+
+**Stitching.** The model sees no future at the right edge of its window and no past at the left edge, so only frames 20…155 of each 172-frame window are kept (`LeftEdgeFrames`, `RightEdgeFrames`); a later window overwrites a frame with more context. Inference takes ~20 ms per window, about 20 % of one core.
+
+**Decoding** follows Basic Pitch's `output_to_notes_polyphonic`, made causal:
+
+| Step | Rule | Constant |
+|---|---|---|
+| Onset | A local peak ≥ 0.5 of the onset output, or of a sharp rise in the note output (Basic Pitch's inferred onsets) | `OnsetThreshold` |
+| Confirm | The note output stays ≥ 0.3 for 6 of the next 7 frames (~70 ms). Low strings on small mics build up slowly, so an onset that fails waits up to 14 frames instead of being dropped | `FrameThreshold`, `ConfirmFrames`, `SlowConfirmFrames` |
+| Noise | The model normalises its input, so room noise can look like notes; the mic level near the onset must be above the listener's noise gate | `AboveGate` |
+| Ringing string | When another string is plucked the model often re-fires a ringing note. A note already sounding 6 frames earlier only counts if its activation rises by 0.15, or, in a strum, if its own partials get 1.6× louder in the audio (re-strummed common tones) | `RepluckRise`, `RepluckEnergyRatio`, `EnergyRise` |
+| Same pluck twice | No second onset on the same key within 12 frames, or on a neighbouring key within 5 | `SameKeyRefractoryFrames`, `ColumnFrames` |
+| Column | Onsets within 5 frames (~60 ms) form one column | `ColumnFrames` |
+| Harmonics | Outside a strum (fewer than 3 fresh notes), any octave/12th/… of a note in the column or played within ~190 ms is dropped. In a strum only a harmonic quieter than 0.55× its root is dropped, so real octaves in chords survive | `StrumNotes`, `StrumShadowRatio`, `RecentShadowFrames` |
+| Sympathetic | Outside a strum, a ringing string re-fired by a new note on one of its harmonics is dropped | `FlushColumn` |
+
+Latency from pluck to tab is about 0.35–0.45 s (right-edge margin + confirmation + run interval).
+
+**String and fret.** `FretboardArranger.ArrangeNext(previous, notes, tuning)` is one step of the Songs arranger's Viterbi search: every playable voicing of the column is scored with the same voicing cost (fret height, span, open strings) plus the transition from the column already on the tab (hand movement, string distance). The previous column is read back from `tabNotes`, so a note the player moved by clicking steers the next one. Confidence is the margin to the second-best voicing. A string lock bypasses this: the loudest note playable on that string goes through `AddTabNote` as before.
+
+## Classic pipeline
 
 ```
 tabListener (2048-sample window, 25 ms blocks, up to 1350 Hz)
@@ -59,7 +93,7 @@ A microphone only hears pitch, and the same note exists on several strings (E4 =
 
 ## Tablature
 
-- `TabNote(Midi, Position, GapBefore)` plus an init-only `Confidence`. `GapBefore` is set when more than `TabGap` (1.5 s) passed since the previous note; it's shown as extra space. A confidence below 0.5 is drawn with a dotted amber outline.
+- `TabNote(Midi, Position, GapBefore)` plus init-only `Confidence` and `ChordWithPrevious`. A chord is several consecutive `TabNote`s, every one after the first with `ChordWithPrevious = true`; `TabText.Columns` groups them, `TabStaff` draws them in one slot, **Undo** removes the whole column, and the string lock leaves chords alone. `GapBefore` is set when more than `TabGap` (1.5 s) passed since the previous note; it's shown as extra space. A confidence below 0.5 is drawn with a dotted amber outline.
 - **`TabStaff`** (control): rows of 6 lines (highest string on top), 30 px per note, wraps to new rows and grows taller inside `TabScroll`. Fret numbers sit on their string over a background patch; the latest note uses `HighlightBrush` (amber), uncertain notes get a dotted amber border. Hit-testing per note drives `NoteClicked`. Call `Refresh()` after changing `Notes`/`Tuning`.
 - **`TabText.Format`**: the **Copy tab** text, 16 notes per row, e.g.
 

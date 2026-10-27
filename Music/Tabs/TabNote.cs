@@ -8,27 +8,47 @@ public sealed record TabNote(int Midi, FretPosition Position, bool GapBefore)
 {
     /// <summary>How clearly the string/fret won over the alternatives (1 = locked or only one position).</summary>
     public double Confidence { get; init; } = 1;
+
+    /// <summary>True when this note sounds together with the note before it (a chord), so both share a column.</summary>
+    public bool ChordWithPrevious { get; init; }
 }
 
 public static class TabText
 {
-    /// <summary>Formats notes as plain-text tablature (highest string on top), wrapped every <paramref name="notesPerRow"/> notes.</summary>
+    /// <summary>Groups notes into columns: a chord's notes share one column.</summary>
+    public static List<List<TabNote>> Columns(IReadOnlyList<TabNote> notes)
+    {
+        var columns = new List<List<TabNote>>();
+        foreach (var note in notes)
+        {
+            if (note.ChordWithPrevious && columns.Count > 0)
+                columns[^1].Add(note);
+            else
+                columns.Add([note]);
+        }
+
+        return columns;
+    }
+
+    /// <summary>Formats notes as plain-text tablature (highest string on top), wrapped every <paramref name="notesPerRow"/> columns.</summary>
     public static string Format(IReadOnlyList<TabNote> notes, int[] tuning, int notesPerRow = 16)
     {
+        var columns = Columns(notes);
         var text = new StringBuilder();
-        for (int start = 0; start < Math.Max(1, notes.Count); start += notesPerRow)
+        for (int start = 0; start < Math.Max(1, columns.Count); start += notesPerRow)
         {
-            var row = notes.Skip(start).Take(notesPerRow).ToList();
+            var row = columns.Skip(start).Take(notesPerRow).ToList();
             for (int s = tuning.Length - 1; s >= 0; s--)
             {
                 text.Append(StringLabel(tuning, s)).Append('|');
-                foreach (var note in row)
+                foreach (var column in row)
                 {
-                    int width = note.Position.Fret >= 10 ? 2 : 1;
-                    if (note.GapBefore)
+                    int width = column.Any(n => n.Position.Fret >= 10) ? 2 : 1;
+                    if (column[0].GapBefore)
                         text.Append("--");
                     text.Append('-');
-                    text.Append(note.Position.String == s ? note.Position.Fret.ToString().PadRight(width, '-') : new string('-', width));
+                    var onString = column.FirstOrDefault(n => n.Position.String == s);
+                    text.Append(onString is not null ? onString.Position.Fret.ToString().PadRight(width, '-') : new string('-', width));
                     text.Append('-');
                 }
 
