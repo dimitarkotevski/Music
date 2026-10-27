@@ -135,12 +135,14 @@ public sealed class FretboardArranger
     /// same voicing and hand-movement costs.
     /// </summary>
     /// <param name="previous">The last column on the tab (as the player may have corrected it), or null.</param>
+    /// <param name="positionCost">Optional extra cost for playing a pitch at a position, e.g. from the learned string sound.</param>
     public SongTabColumn? ArrangeNext(
         SongTabColumn? previous,
         IReadOnlyList<TranscribedNote> notes,
         int[] tuning,
         int maxFret = DefaultMaxFret,
-        ArrangementMode mode = ArrangementMode.Chords)
+        ArrangementMode mode = ArrangementMode.Chords,
+        Func<int, FretPosition, double>? positionCost = null)
     {
         int lowest = tuning.Min();
         int highest = tuning.Max() + maxFret;
@@ -176,7 +178,9 @@ public sealed class FretboardArranger
         }
 
         var scored = voicings
-            .Select(v => (Voicing: v, Cost: v.Cost + (before is null ? 0 : Transition(before, v, v.Start - before.Start))))
+            .Select(v => (Voicing: v, Cost: v.Cost
+                + (before is null ? 0 : Transition(before, v, v.Start - before.Start))
+                + (positionCost is null ? 0 : v.Notes.Select((n, i) => positionCost(n.Midi, v.Positions[i])).Sum())))
             .OrderBy(x => x.Cost)
             .ToList();
 

@@ -51,6 +51,13 @@ public sealed class LiveNoteModel : IDisposable
     private const double RepluckEnergyRatio = 1.6;
     private const int EnergyWindow = 1024; // about 46 ms
 
+    // Sound fingerprint (SoundProfile): a 93 ms window starting just after the attack, and a second one
+    // 100 ms later for the decay. Both end 0.22 s after the onset, before any note can be reported.
+    private const int ProfileHarmonics = 10;
+    private const int ProfileWindow = 2048;
+    private const int ProfileDelay = 512;
+    private const int ProfileDecayGap = 2205;
+
     // A column with at least this many freshly started notes is a strum. Strums re-strike strings that were
     // already ringing and contain real octaves, so they are filtered more gently than single notes.
     private const int StrumNotes = 3;
@@ -430,18 +437,67 @@ public sealed class LiveNoteModel : IDisposable
         return after / Math.Max(before, 1e-9);
     }
 
-    private double PartialEnergy(long start, double frequency)
+    private double PartialEnergy(long start, double frequency) =>
+        ReadAudio(start, EnergyWindow) is float[] window
+            ? Goertzel(window, frequency) + 0.5 * Goertzel(window, 2 * frequency)
+            : 0;
+
+    /// <summary>
+    /// A fingerprint of how a single note sounds, for telling strings apart: the strength of harmonics
+    /// 2–10 relative to the fundamental, the average harmonic number, and how fast the note fades.
+    /// For the same pitch, a thicker string and a longer vibrating length change all three a little.
+    /// Returns null when the audio around the note is no longer (or not yet) in the buffer.
+    /// </summary>
+    /// <param name="startSeconds">The note's <see cref="TranscribedNote.Start"/>.</param>
+    public double[]? SoundProfile(double startSeconds, int midi)
     {
-        var window = new float[EnergyWindow];
+        double fundamental = 440 * Math.Pow(2, (midi - 69) / 12.0);
+        long onset = (long)Math.Round(startSeconds * BasicPitchModel.SampleRate);
+        if (ReadAudio(onset + ProfileDelay, ProfileWindow) is not float[] early
+            || ReadAudio(onset + ProfileDelay + ProfileDecayGap, ProfileWindow) is not float[] late)
+            return null;
+
+        var harmonics = new double[ProfileHarmonics];
+        for (int h = 1; h <= ProfileHarmonics; h++)
+        {
+            // Wound strings are slightly inharmonic: their upper partials sit a little sharp.
+            foreach (double stretch in (double[])[0.99, 1.0, 1.01, 1.02])
+                harmonics[h - 1] = Math.Max(harmonics[h - 1], Goertzel(early, fundamental * h * stretch));
+        }
+
+        if (harmonics[0] < 1e-6)
+            return null;
+
+        var profile = new double[ProfileHarmonics + 1];
+        double weighted = 0, total = 0;
+        for (int h = 1; h <= ProfileHarmonics; h++)
+        {
+            if (h > 1)
+                profile[h - 2] = Math.Log10(harmonics[h - 1] / harmonics[0] + 1e-3);
+            weighted += h * harmonics[h - 1];
+            total += harmonics[h - 1];
+        }
+
+        profile[ProfileHarmonics - 1] = weighted / total;
+        double earlyLevel = Goertzel(early, fundamental) + Goertzel(early, 2 * fundamental);
+        double lateLevel = Goertzel(late, fundamental) + Goertzel(late, 2 * fundamental);
+        profile[ProfileHarmonics] = Math.Log10((lateLevel + 1e-9) / (earlyLevel + 1e-9));
+        return profile;
+    }
+
+    /// <summary>A copy of the downsampled audio, or null if it is not (or no longer) in the buffer.</summary>
+    private float[]? ReadAudio(long start, int length)
+    {
+        var window = new float[length];
         lock (audioLock)
         {
-            if (start < 0 || start < samplesWritten - HistorySamples || start + EnergyWindow > samplesWritten)
-                return 0;
-            for (int i = 0; i < EnergyWindow; i++)
+            if (start < 0 || start < samplesWritten - HistorySamples || start + length > samplesWritten)
+                return null;
+            for (int i = 0; i < length; i++)
                 window[i] = audio[(start + i) % HistorySamples];
         }
 
-        return Goertzel(window, frequency) + 0.5 * Goertzel(window, 2 * frequency);
+        return window;
     }
 
     /// <summary>Hann-windowed magnitude of one frequency.</summary>

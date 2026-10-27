@@ -11,7 +11,19 @@ public sealed record TabNote(int Midi, FretPosition Position, bool GapBefore)
 
     /// <summary>True when this note sounds together with the note before it (a chord), so both share a column.</summary>
     public bool ChordWithPrevious { get; init; }
+
+    /// <summary>How the note sounded when it was heard (for string training), or null.</summary>
+    public HeardSound? Heard { get; init; }
+
+    /// <summary>True when the position came from the player's saved tabs (<see cref="FingeringMemory"/>).</summary>
+    public bool Remembered { get; init; }
+
+    /// <summary>True when the player set this note by hand; nothing automatic changes it afterwards.</summary>
+    public bool Edited { get; init; }
 }
+
+/// <summary>The pitch that was heard and its <see cref="LiveNoteModel.SoundProfile"/>.</summary>
+public sealed record HeardSound(int Midi, double[] Profile);
 
 public static class TabText
 {
