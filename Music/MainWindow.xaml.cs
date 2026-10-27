@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         InitializeMetronome();
         InitializeChords();
         InitializeTabs();
+        InitializeSongs();
     }
 
     private void OnPitch(PitchReading reading)
@@ -363,14 +364,17 @@ public partial class MainWindow : Window
     private void BackToMenu_Click(object sender, RoutedEventArgs e)
     {
         StopTabTest();
+        StopSongWorker();
         listener.Stop();
         chordListener.Stop();
         tabListener.Stop();
+        StopTabDebugLog();
         tonePlayer.Stop();
         StopMetronome();
         TunerView.Visibility = Visibility.Collapsed;
         ChordView.Visibility = Visibility.Collapsed;
         TabView.Visibility = Visibility.Collapsed;
+        SongView.Visibility = Visibility.Collapsed;
         MetronomeView.Visibility = Visibility.Collapsed;
         StartMenu.Visibility = Visibility.Visible;
     }
@@ -380,6 +384,8 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
         StopTabTest();
+        StopSongWorker();
+        StopTabDebugLog();
         listener.Dispose();
         chordListener.Dispose();
         tabListener.Dispose();

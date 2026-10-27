@@ -1,5 +1,6 @@
 .vs/
 bin/
 obj/
+.venv-transcription/
 *.user
 *.suo

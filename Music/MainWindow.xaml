@@ -142,6 +142,8 @@
                     Click="StartChords_Click" />
             <Button Content="Tabs" Style="{StaticResource MenuButton}" Background="#F59E0B" Margin="0,14,0,0"
                     Click="StartTabs_Click" />
+            <Button Content="Songs" Style="{StaticResource MenuButton}" Background="#3D7BFF" Margin="0,14,0,0"
+                    Click="StartSongs_Click" ToolTip="Transcribe an audio file into tablature" />
             <Button Content="Metronome" Style="{StaticResource MenuButton}" Background="#8B5CF6" Margin="0,14,0,0"
                     Click="StartMetronome_Click" />
             <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
@@ -433,6 +435,100 @@
                         </StackPanel>
                     </Border>
                 </Border>
+            </Grid>
+        </DockPanel>
+
+        <!-- Songs: transcribe an audio file, then arrange notes on the neck -->
+        <DockPanel x:Name="SongView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="SongFileText" Height="30" IsReadOnly="True" VerticalContentAlignment="Center"
+                             Background="#1B1E27" Foreground="#9AA0B4" BorderBrush="#3A4050"
+                             ToolTip="An audio file with a guitar part" />
+                    <Button x:Name="SongBrowseButton" Grid.Column="1" Content="Browse…" Style="{StaticResource SmallButton}" Width="82"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="BrowseSong_Click" />
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="SongTuningBox" Grid.Column="1" Height="28" DisplayMemberPath="DisplayName"
+                              HorizontalAlignment="Left" Width="200" />
+                    <CheckBox x:Name="SongSoloBox" Grid.Column="2" Content="Solo" Foreground="#E6E8EF"
+                              VerticalAlignment="Center" Margin="8,0,0,0"
+                              ToolTip="Keep only the strongest note at each onset instead of building chords"
+                              Checked="SongSoloBox_Changed" Unchecked="SongSoloBox_Changed" />
+                    <Button x:Name="SongTranscribeButton" Grid.Column="3" Content="Transcribe"
+                            Style="{StaticResource SmallButton}" Width="94" Height="30" FontSize="13"
+                            Margin="8,0,0,0" Click="TranscribeSong_Click"
+                            ToolTip="Run Basic Pitch on the selected audio file" />
+                    <Button x:Name="SongCancelButton" Grid.Column="4" Content="Cancel"
+                            Style="{StaticResource SmallButton}" Width="72" Height="30" FontSize="13"
+                            Margin="8,0,0,0" Visibility="Collapsed" Click="CancelSong_Click" />
+                </Grid>
+
+                <StackPanel Grid.Row="2" Margin="0,10,0,8">
+                    <DockPanel LastChildFill="True">
+                        <ProgressBar x:Name="SongProgressBar" DockPanel.Dock="Right" Width="118" Height="6"
+                                     IsIndeterminate="True" Visibility="Collapsed" Background="#232733"
+                                     Foreground="#3D7BFF" BorderThickness="0" VerticalAlignment="Center"
+                                     Margin="10,0,0,0" />
+                        <TextBlock x:Name="SongStatusText" Text="Choose an audio file to begin."
+                                   FontSize="13" Foreground="#9AA0B4" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+                    <TextBlock x:Name="SongInfoText" Text=" " FontSize="11" Foreground="#6C7389"
+                               Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border Grid.Row="3" Background="#1B1E27" CornerRadius="10" Padding="4,6">
+                    <ScrollViewer x:Name="SongScroll" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <controls:SongTabStaff x:Name="SongStaffView"
+                                               ToolTip="Click a note to move it to the next string. Right-click to remove it." />
+                    </ScrollViewer>
+                </Border>
+
+                <DockPanel Grid.Row="4" Margin="0,12,0,0" LastChildFill="False">
+                    <TextBlock x:Name="SongHintText"
+                               Text="Python with basic-pitch is required. Run tools\setup-transcription.ps1 once."
+                               Foreground="#6C7389" FontSize="11" VerticalAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="138" />
+                    <Button DockPanel.Dock="Right" Content="MusicXML" Style="{StaticResource SmallButton}"
+                            Width="84" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ExportSongMusicXml_Click" />
+                    <Button DockPanel.Dock="Right" Content="MIDI" Style="{StaticResource SmallButton}"
+                            Width="64" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ExportSongMidi_Click" />
+                    <Button DockPanel.Dock="Right" Content="Copy tab" Style="{StaticResource SmallButton}"
+                            Width="76" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="CopySongTab_Click" />
+                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}"
+                            Width="58" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ClearSong_Click" />
+                </DockPanel>
             </Grid>
         </DockPanel>
 

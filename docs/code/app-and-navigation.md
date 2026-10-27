@@ -24,9 +24,10 @@ Each screen is a panel in `MainWindow.xaml`. Exactly one is `Visible`; the other
 | Tuner | `TunerView` | `StartTuning_Click` | [Tuner](tuner.md) |
 | Chords | `ChordView` | `StartChords_Click` | [Chords](chords.md) |
 | Tabs | `TabView` | `StartTabs_Click` | [Tabs](tabs.md) |
+| Songs | `SongView` | `StartSongs_Click` | [Songs](songs.md) |
 | Metronome | `MetronomeView` | `StartMetronome_Click` | [Metronome](metronome.md) |
 
-The start menu buttons in order: **Tuning** (blue), **Chords** (teal), **Tabs** (amber), **Metronome** (purple), **Quit**.
+The start menu buttons in order: **Tuning** (blue), **Chords** (teal), **Tabs** (amber), **Songs** (blue), **Metronome** (purple), **Quit**.
 
 Tuning and microphone choices are shared: the tuner's `TuningBox` and `DeviceBox` are the master copies, and the chords/tabs screens' boxes (`ChordDeviceBox`, `TabTuningBox`, `TabDeviceBox`) are synced both ways in their `SelectionChanged` handlers.
 
@@ -34,10 +35,10 @@ Tuning and microphone choices are shared: the tuner's `TuningBox` and `DeviceBox
 
 `BackToMenu_Click` (the **← Menu** button on every screen, or **Esc** via `BackToMenuCommand`):
 
-1. Stops everything that makes or records sound: `listener.Stop()`, `chordListener.Stop()`, `tabListener.Stop()`, `tonePlayer.Stop()`, `StopMetronome()`.
+1. Stops everything that makes or records sound: `listener.Stop()`, `chordListener.Stop()`, `tabListener.Stop()`, `tonePlayer.Stop()`, `StopMetronome()`, and cancels any running Songs worker with `StopSongWorker()`.
 2. Collapses all screens and shows `StartMenu`.
 
-Each microphone only runs while its screen is open (tuner, chords or tabs).
+Each microphone only runs while its screen is open (tuner, chords or tabs). Songs does not use the microphone; it runs an external Python process only while **Transcribe** is active.
 
 ### Adding a new screen
 
@@ -55,9 +56,9 @@ Each microphone only runs while its screen is open (tuner, chords or tabs).
 1. `InitializeComponent()`, then `DrawGauge()` (tuner gauge ticks).
 2. Subscribes `listener.PitchUpdated` → `OnPitch`.
 3. Fills the tuning dropdown (`TuningBox`) and microphone dropdown (`DeviceBox`).
-4. `InitializeMetronome()`, `InitializeChords()` and `InitializeTabs()`.
+4. `InitializeMetronome()`, `InitializeChords()`, `InitializeTabs()` and `InitializeSongs()`.
 
-**Closing** (`Window_Closing`): disposes `listener`, `chordListener`, `tabListener`, `tonePlayer`, `metronome`.
+**Closing** (`Window_Closing`): cancels the Songs worker, then disposes `listener`, `chordListener`, `tabListener`, `tonePlayer`, `metronome`.
 
 ## Keyboard shortcuts
 

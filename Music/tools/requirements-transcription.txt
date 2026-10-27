@@ -1,0 +1,13 @@
+# Runtime dependencies for tools/basic_pitch_worker.py
+# basic-pitch itself is installed separately with --no-deps by setup-transcription.ps1
+# so pip does not pull TensorFlow; the worker uses the ONNX backend.
+numpy>=1.18,<3
+scipy>=1.11
+librosa==0.10.2
+soundfile==0.12.1
+resampy>=0.2.2,<0.4.3
+mir_eval>=0.6
+pretty-midi==0.2.10
+note-seq==0.0.5
+onnxruntime>=1.17.0
+setuptools<81
