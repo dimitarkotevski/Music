@@ -2,7 +2,7 @@
 
 [← Code guide](README.md)
 
-The tuner screen (`TunerView`). Logic is in [MainWindow.xaml.cs](../../Music/MainWindow.xaml.cs); pitch detection is in the [audio layer](audio.md).
+The tuner screen (`TunerView`). Logic is in [MainWindow.xaml.cs](../../AllTunning/MainWindow.xaml.cs); pitch detection is in the [audio layer](audio.md).
 
 ## Controls (MainWindow.xaml)
 

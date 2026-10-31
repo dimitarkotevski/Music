@@ -4,8 +4,8 @@
 
 | File | Contents |
 |---|---|
-| [Audio/Metronome.cs](../../Music/Audio/Metronome.cs) | `TimeSignature`, `Metronome` (engine), private `ClickTrack` (sample generator) |
-| [MainWindow.Metronome.cs](../../Music/MainWindow.Metronome.cs) | Metronome screen UI |
+| [Audio/Metronome.cs](../../AllTunning/Audio/Metronome.cs) | `TimeSignature`, `Metronome` (engine), private `ClickTrack` (sample generator) |
+| [MainWindow.Metronome.cs](../../AllTunning/MainWindow.Metronome.cs) | Metronome screen UI |
 
 ## Engine: `Metronome`
 

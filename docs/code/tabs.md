@@ -2,20 +2,20 @@
 
 [← Code guide](README.md)
 
-Writes every note you play as guitar tablature, including which string it's on. Logic is in [Music/Tabs/](../../Music/Tabs/); the screen is in [MainWindow.Tabs.cs](../../Music/MainWindow.Tabs.cs).
+Writes every note you play as guitar tablature, including which string it's on. Logic is in [AllTunning/Tabs/](../../AllTunning/Tabs/); the screen is in [MainWindow.Tabs.cs](../../AllTunning/MainWindow.Tabs.cs).
 
 There are two detectors, chosen in the **Detector** box: **AI** (default) runs Spotify's Basic Pitch neural network in-process and hears chords and notes over ringing strings; **Classic** is the original one-note-at-a-time YIN pipeline, kept for comparison and as the fallback when the model file is missing.
 
 | File | Contents |
 |---|---|
-| [Transcription/BasicPitchModel.cs](../../Music/Transcription/BasicPitchModel.cs) | `BasicPitchModel`: runs `Models/basic-pitch.onnx` through ONNX Runtime (2 s of 22.05 kHz audio → 172 frames × 88 keys of note and onset activations) |
-| [Tabs/LiveNoteModel.cs](../../Music/Tabs/LiveNoteModel.cs) | `LiveNoteModel`: streams microphone blocks through the model and decodes notes causally; raises `ColumnDetected` with the notes that started together |
-| [Transcription/FretboardArranger.cs](../../Music/Transcription/FretboardArranger.cs) | `ArrangeNext`: places each new AI column on the neck (shared with the Songs screen's `Arrange`) |
-| [Tabs/NoteTracker.cs](../../Music/Tabs/NoteTracker.cs) | `NoteTracker`: pitch readings → one `DetectedNote` per played note |
-| [Tabs/FretAssigner.cs](../../Music/Tabs/FretAssigner.cs) | `FretAssigner`: picks the string/fret; `FretPosition` |
-| [Tabs/TabNote.cs](../../Music/Tabs/TabNote.cs) | `TabNote` (a written note) and `TabText` (plain-text tab, string labels/names) |
-| [Controls/TabStaff.cs](../../Music/Controls/TabStaff.cs) | `TabStaff`: draws the tab, raises `NoteClicked` |
-| [MainWindow.Tabs.cs](../../Music/MainWindow.Tabs.cs) | Tabs screen UI |
+| [Transcription/BasicPitchModel.cs](../../AllTunning/Transcription/BasicPitchModel.cs) | `BasicPitchModel`: runs `Models/basic-pitch.onnx` through ONNX Runtime (2 s of 22.05 kHz audio → 172 frames × 88 keys of note and onset activations) |
+| [Tabs/LiveNoteModel.cs](../../AllTunning/Tabs/LiveNoteModel.cs) | `LiveNoteModel`: streams microphone blocks through the model and decodes notes causally; raises `ColumnDetected` with the notes that started together |
+| [Transcription/FretboardArranger.cs](../../AllTunning/Transcription/FretboardArranger.cs) | `ArrangeNext`: places each new AI column on the neck (shared with the Songs screen's `Arrange`) |
+| [Tabs/NoteTracker.cs](../../AllTunning/Tabs/NoteTracker.cs) | `NoteTracker`: pitch readings → one `DetectedNote` per played note |
+| [Tabs/FretAssigner.cs](../../AllTunning/Tabs/FretAssigner.cs) | `FretAssigner`: picks the string/fret; `FretPosition` |
+| [Tabs/TabNote.cs](../../AllTunning/Tabs/TabNote.cs) | `TabNote` (a written note) and `TabText` (plain-text tab, string labels/names) |
+| [Controls/TabStaff.cs](../../AllTunning/Controls/TabStaff.cs) | `TabStaff`: draws the tab, raises `NoteClicked` |
+| [MainWindow.Tabs.cs](../../AllTunning/MainWindow.Tabs.cs) | Tabs screen UI |
 
 ## AI pipeline
 
@@ -73,9 +73,9 @@ A microphone hears pitch, not strings: open A and low E fret 5 are the same note
 
 | File | Contents |
 |---|---|
-| [Tabs/TrainingPhrases.cs](../../Music/Tabs/TrainingPhrases.cs) | The phrases, generated from the tuning: open strings, the same notes on neighbouring strings and two strings apart, and each string up the neck |
-| [Tabs/StringTimbreModel.cs](../../Music/Tabs/StringTimbreModel.cs) | `StringTimbreModel` (nearest-neighbour model of each string's sound) and `StringSoundExample` |
-| [MainWindow.Training.cs](../../Music/MainWindow.Training.cs) | The **Train** overlay |
+| [Tabs/TrainingPhrases.cs](../../AllTunning/Tabs/TrainingPhrases.cs) | The phrases, generated from the tuning: open strings, the same notes on neighbouring strings and two strings apart, and each string up the neck |
+| [Tabs/StringTimbreModel.cs](../../AllTunning/Tabs/StringTimbreModel.cs) | `StringTimbreModel` (nearest-neighbour model of each string's sound) and `StringSoundExample` |
+| [MainWindow.Training.cs](../../AllTunning/MainWindow.Training.cs) | The **Train** overlay |
 
 **Flow.** **Train** shows a phrase on a `TabStaff` with the next note highlighted (`HighlightIndex`). While training runs, `AddTabColumn` hands every AI column to `TrainingColumn` instead of the tab. A note that matches the asked pitch (or the one after it, if the detector missed one) is labelled with the asked string/fret, together with `LiveNoteModel.SoundProfile`: harmonics 2–10 relative to the fundamental (searched slightly sharp for wound-string inharmonicity), the average harmonic number, and the decay over 100 ms. Examples are saved after every phrase to `Desktop\GuitarTabsTest\training\string-sounds.json`, with a WAV of the session next to it.
 

@@ -2,14 +2,14 @@
 
 [← Code guide](README.md)
 
-Shared audio code in [Music/Audio/](../../Music/Audio/). Uses [NAudio](https://github.com/naudio/NAudio) (WinMM `WaveInEvent` / `WaveOutEvent`).
+Shared audio code in [AllTunning/Audio/](../../AllTunning/Audio/). Uses [NAudio](https://github.com/naudio/NAudio) (WinMM `WaveInEvent` / `WaveOutEvent`).
 
 | File | Class | Job |
 |---|---|---|
-| [MicrophoneListener.cs](../../Music/Audio/MicrophoneListener.cs) | `MicrophoneListener` | Records the mic, applies the noise gate, raises events |
-| [PitchDetector.cs](../../Music/Audio/PitchDetector.cs) | `PitchDetector` | Finds the pitch of a single note (YIN) |
-| [TonePlayer.cs](../../Music/Audio/TonePlayer.cs) | `TonePlayer` | Plays the tuner's reference tones |
-| [Metronome.cs](../../Music/Audio/Metronome.cs) | `Metronome` | Click engine, see [Metronome](metronome.md) |
+| [MicrophoneListener.cs](../../AllTunning/Audio/MicrophoneListener.cs) | `MicrophoneListener` | Records the mic, applies the noise gate, raises events |
+| [PitchDetector.cs](../../AllTunning/Audio/PitchDetector.cs) | `PitchDetector` | Finds the pitch of a single note (YIN) |
+| [TonePlayer.cs](../../AllTunning/Audio/TonePlayer.cs) | `TonePlayer` | Plays the tuner's reference tones |
+| [Metronome.cs](../../AllTunning/Audio/Metronome.cs) | `Metronome` | Click engine, see [Metronome](metronome.md) |
 
 ## MicrophoneListener
 

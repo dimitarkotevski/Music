@@ -8,11 +8,11 @@ The whole app is one window, `MainWindow`, that shows one screen at a time.
 
 | File | What's in it |
 |---|---|
-| [App.xaml](../../Music/App.xaml) | Starts the app; `StartupUri="MainWindow.xaml"` |
-| [MainWindow.xaml](../../Music/MainWindow.xaml) | Markup for **all** screens, button styles, keyboard shortcuts |
-| [MainWindow.xaml.cs](../../Music/MainWindow.xaml.cs) | Constructor, navigation, shared colours, closing, and the **tuner** screen |
-| [MainWindow.Chords.cs](../../Music/MainWindow.Chords.cs) | Chord screen (same `MainWindow` class, `partial`) |
-| [MainWindow.Metronome.cs](../../Music/MainWindow.Metronome.cs) | Metronome screen (same `MainWindow` class, `partial`) |
+| [App.xaml](../../AllTunning/App.xaml) | Starts the app; `StartupUri="MainWindow.xaml"` |
+| [MainWindow.xaml](../../AllTunning/MainWindow.xaml) | Markup for **all** screens, button styles, keyboard shortcuts |
+| [MainWindow.xaml.cs](../../AllTunning/MainWindow.xaml.cs) | Constructor, navigation, shared colours, closing, and the **tuner** screen |
+| [MainWindow.Chords.cs](../../AllTunning/MainWindow.Chords.cs) | Chord screen (same `MainWindow` class, `partial`) |
+| [MainWindow.Metronome.cs](../../AllTunning/MainWindow.Metronome.cs) | Metronome screen (same `MainWindow` class, `partial`) |
 
 ## Screens
 
@@ -20,7 +20,7 @@ Each screen is a panel in `MainWindow.xaml`. Exactly one is `Visible`; the other
 
 | Screen | Element name | Opened by | Code |
 |---|---|---|---|
-| Start menu | `StartMenu` | App start, `BackToMenu_Click` | [MainWindow.xaml.cs](../../Music/MainWindow.xaml.cs) |
+| Start menu | `StartMenu` | App start, `BackToMenu_Click` | [MainWindow.xaml.cs](../../AllTunning/MainWindow.xaml.cs) |
 | Tuner | `TunerView` | `StartTuning_Click` | [Tuner](tuner.md) |
 | Chords | `ChordView` | `StartChords_Click` | [Chords](chords.md) |
 | Tabs | `TabView` | `StartTabs_Click` | [Tabs](tabs.md) |
@@ -51,7 +51,7 @@ Each microphone only runs while its screen is open (tuner, chords or tabs). Song
 
 ## Startup and shutdown
 
-**Constructor** (`MainWindow()` in [MainWindow.xaml.cs](../../Music/MainWindow.xaml.cs)):
+**Constructor** (`MainWindow()` in [MainWindow.xaml.cs](../../AllTunning/MainWindow.xaml.cs)):
 
 1. `InitializeComponent()`, then `DrawGauge()` (tuner gauge ticks).
 2. Subscribes `listener.PitchUpdated` → `OnPitch`.

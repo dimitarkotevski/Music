@@ -2,15 +2,15 @@
 
 [← Code guide](README.md)
 
-Chord recognition. Analysis is in [Music/Chords/](../../Music/Chords/); the screen is in [MainWindow.Chords.cs](../../Music/MainWindow.Chords.cs).
+Chord recognition. Analysis is in [AllTunning/Chords/](../../AllTunning/Chords/); the screen is in [MainWindow.Chords.cs](../../AllTunning/MainWindow.Chords.cs).
 
 | File | Contents |
 |---|---|
-| [Chord.cs](../../Music/Chords/Chord.cs) | `ChordQuality` (chord types) and `Chord` (a recognised chord) |
-| [ChordDetector.cs](../../Music/Chords/ChordDetector.cs) | `ChordDetector` and its result `ChordAnalysis` |
-| [ChordShape.cs](../../Music/Chords/ChordShape.cs) | `ChordShape` (a fingering) and `ChordShapes.Find` (shape library) |
-| [Controls/ChordDiagram.cs](../../Music/Controls/ChordDiagram.cs) | `ChordDiagram`, the chord box drawing |
-| [MainWindow.Chords.cs](../../Music/MainWindow.Chords.cs) | Chord screen UI |
+| [Chord.cs](../../AllTunning/Chords/Chord.cs) | `ChordQuality` (chord types) and `Chord` (a recognised chord) |
+| [ChordDetector.cs](../../AllTunning/Chords/ChordDetector.cs) | `ChordDetector` and its result `ChordAnalysis` |
+| [ChordShape.cs](../../AllTunning/Chords/ChordShape.cs) | `ChordShape` (a fingering) and `ChordShapes.Find` (shape library) |
+| [Controls/ChordDiagram.cs](../../AllTunning/Controls/ChordDiagram.cs) | `ChordDiagram`, the chord box drawing |
+| [MainWindow.Chords.cs](../../AllTunning/MainWindow.Chords.cs) | Chord screen UI |
 
 ## Chord types: `ChordQuality.All`
 

@@ -25,16 +25,16 @@ Audio → notes and notes → string/fret are separate layers. The Python worker
 
 | File | Contents |
 |---|---|
-| [Transcription/BasicPitchTranscriber.cs](../../Music/Transcription/BasicPitchTranscriber.cs) | `TranscriptionResult`, `TranscribedNote`, `BasicPitchTranscriber`, `IFileTranscriber`; starts the Python worker and reads its JSON |
-| [Transcription/FretboardArranger.cs](../../Music/Transcription/FretboardArranger.cs) | `FretboardArranger`, `ArrangementResult`, `SongTabColumn`, `ArrangedNote`; polyphonic string/fret assignment |
-| [Transcription/SongTabText.cs](../../Music/Transcription/SongTabText.cs) | Plain-text tab export with multiple notes per column |
-| [Transcription/MidiExporter.cs](../../Music/Transcription/MidiExporter.cs) | Standard MIDI File export using NAudio.Midi |
-| [Transcription/MusicXmlExporter.cs](../../Music/Transcription/MusicXmlExporter.cs) | MusicXML tab score export |
-| [Controls/SongTabStaff.cs](../../Music/Controls/SongTabStaff.cs) | Read-only tab control; draws chord columns, timing labels and dotted uncertain notes |
-| [MainWindow.Songs.cs](../../Music/MainWindow.Songs.cs) | Songs screen: file picker, transcription, tuning, cancel, copy/export |
-| [tools/basic_pitch_worker.py](../../Music/tools/basic_pitch_worker.py) | Python worker: audio → JSON note events |
-| [tools/setup-transcription.ps1](../../Music/tools/setup-transcription.ps1) | One-time local Python environment setup |
-| [tools/requirements-transcription.txt](../../Music/tools/requirements-transcription.txt) | Python dependencies |
+| [Transcription/BasicPitchTranscriber.cs](../../AllTunning/Transcription/BasicPitchTranscriber.cs) | `TranscriptionResult`, `TranscribedNote`, `BasicPitchTranscriber`, `IFileTranscriber`; starts the Python worker and reads its JSON |
+| [Transcription/FretboardArranger.cs](../../AllTunning/Transcription/FretboardArranger.cs) | `FretboardArranger`, `ArrangementResult`, `SongTabColumn`, `ArrangedNote`; polyphonic string/fret assignment |
+| [Transcription/SongTabText.cs](../../AllTunning/Transcription/SongTabText.cs) | Plain-text tab export with multiple notes per column |
+| [Transcription/MidiExporter.cs](../../AllTunning/Transcription/MidiExporter.cs) | Standard MIDI File export using NAudio.Midi |
+| [Transcription/MusicXmlExporter.cs](../../AllTunning/Transcription/MusicXmlExporter.cs) | MusicXML tab score export |
+| [Controls/SongTabStaff.cs](../../AllTunning/Controls/SongTabStaff.cs) | Read-only tab control; draws chord columns, timing labels and dotted uncertain notes |
+| [MainWindow.Songs.cs](../../AllTunning/MainWindow.Songs.cs) | Songs screen: file picker, transcription, tuning, cancel, copy/export |
+| [tools/basic_pitch_worker.py](../../AllTunning/tools/basic_pitch_worker.py) | Python worker: audio → JSON note events |
+| [tools/setup-transcription.ps1](../../AllTunning/tools/setup-transcription.ps1) | One-time local Python environment setup |
+| [tools/requirements-transcription.txt](../../AllTunning/tools/requirements-transcription.txt) | Python dependencies |
 
 ## Python environment
 
@@ -48,10 +48,10 @@ The model is intentionally isolated in a subprocess so a future ONNX or other ba
 Run once from the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File Music\tools\setup-transcription.ps1
+powershell -ExecutionPolicy Bypass -File AllTunning\tools\setup-transcription.ps1
 ```
 
-The script creates `Music\Music\.venv-transcription` (the project folder) and installs the ONNX runtime without pulling TensorFlow. Basic Pitch is installed with `--no-deps` on purpose; its other dependencies are pinned in `requirements-transcription.txt`.
+The script creates `Music\AllTunning\.venv-transcription` (the project folder) and installs the ONNX runtime without pulling TensorFlow. Basic Pitch is installed with `--no-deps` on purpose; its other dependencies are pinned in `requirements-transcription.txt`.
 
 The worker is copied to `bin\…\tools\basic_pitch_worker.py` by the project file. The C# side uses `Process` with redirected stdout/stderr and passes arguments through `ArgumentList`, so paths with spaces are safe. Cancellation kills the whole process tree.
 

@@ -30,25 +30,25 @@ The tuner (with custom tunings) and metronome are also available as an Android a
 - Windows 10 or 11
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - A microphone
-- Python 3.10–3.13 with the packages in `Music\tools\requirements-transcription.txt` for the **Songs** screen (the rest of the app runs without Python)
+- Python 3.10–3.13 with the packages in `AllTunning\tools\requirements-transcription.txt` for the **Songs** screen (the rest of the app runs without Python)
 
 ## Getting started
 
 ```sh
 git clone https://github.com/dimitarkotevski/Music.git
 cd Music
-dotnet run --project Music
+dotnet run --project AllTunning
 ```
 
-You can also open `Music.slnx` in Visual Studio and press **F5**.
+You can also open `AllTunning.slnx` in Visual Studio and press **F5**.
 
 For the **Songs** screen, install the transcription model once:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File Music\tools\setup-transcription.ps1
+powershell -ExecutionPolicy Bypass -File AllTunning\tools\setup-transcription.ps1
 ```
 
-This creates `Music\Music\.venv-transcription` and installs Basic Pitch with the ONNX backend. If you already have another environment, set the `MUSIC_PYTHON` environment variable to its `python.exe` before starting the app.
+This creates `Music\AllTunning\.venv-transcription` and installs Basic Pitch with the ONNX backend. If you already have another environment, set the `MUSIC_PYTHON` environment variable to its `python.exe` before starting the app.
 
 ## How to use
 
@@ -84,7 +84,7 @@ This creates `Music\Music\.venv-transcription` and installs Basic Pitch with the
 > 📖 For a detailed map of the code (every class, what it does, and where to change things), see the **[code guide](docs/code/README.md)**.
 
 ```
-Music/
+AllTunning/
 ├── App.xaml                  # Application entry point
 ├── MainWindow.xaml(.cs)      # Start menu and tuner UI
 ├── MainWindow.Tabs.cs        # Tabs screen
@@ -115,7 +115,7 @@ Music/
     └── NoteMath.cs           # Frequency / note / cents conversions
 ```
 
-To add a tuning, add one line to the list in `Music/Tuning/GuitarTuning.cs`:
+To add a tuning, add one line to the list in `AllTunning/Tuning/GuitarTuning.cs`:
 
 ```csharp
 Create("Open D Minor", "D2 A2 D3 F3 A3 D4"),

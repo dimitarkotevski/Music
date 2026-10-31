@@ -2,11 +2,11 @@
 
 [← Code guide](README.md)
 
-Small, UI-free helpers in [Music/Tuning/](../../Music/Tuning/), used by the tuner and the chord detector.
+Small, UI-free helpers in [Music/Tuning/](../../AllTunning/Tuning/), used by the tuner and the chord detector.
 
 ## NoteMath
 
-[NoteMath.cs](../../Music/Tuning/NoteMath.cs). Notes are **MIDI numbers** (A4 = 69, middle C = 60, low E string = 40). The A4 reference (usually 440 Hz) is passed in so the tuner's A4 setting applies everywhere.
+[NoteMath.cs](../../AllTunning/Tuning/NoteMath.cs). Notes are **MIDI numbers** (A4 = 69, middle C = 60, low E string = 40). The A4 reference (usually 440 Hz) is passed in so the tuner's A4 setting applies everywhere.
 
 | Method | Formula / behaviour |
 |---|---|
@@ -19,7 +19,7 @@ Small, UI-free helpers in [Music/Tuning/](../../Music/Tuning/), used by the tune
 
 ## GuitarTuning
 
-[GuitarTuning.cs](../../Music/Tuning/GuitarTuning.cs). `Name`, `Strings` (6 MIDI notes, **lowest string first**), and `DisplayName` for the dropdown, e.g. "Standard  (E A D G B E)".
+[GuitarTuning.cs](../../AllTunning/Tuning/GuitarTuning.cs). `Name`, `Strings` (6 MIDI notes, **lowest string first**), and `DisplayName` for the dropdown, e.g. "Standard  (E A D G B E)".
 
 `GuitarTuning.All`, in dropdown order:
 

@@ -1,4 +1,4 @@
-// Port of Music/Audio/PitchDetector.cs: YIN (de Cheveigné and Kawahara, 2002) with the
+// Port of AllTunning/Audio/PitchDetector.cs: YIN (de Cheveigné and Kawahara, 2002) with the
 // same octave and subharmonic corrections as the desktop tuner.
 
 // Lower = stricter: only clearly periodic sounds (like a plucked string) pass.

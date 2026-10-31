@@ -1,0 +1,634 @@
+<Window x:Class="AllTunning.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AllTunning"
+        xmlns:controls="clr-namespace:AllTunning.Controls"
+        Title="Guitar Tuner"
+        Width="560" Height="765"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Background="#15171E"
+        Foreground="#E6E8EF"
+        FontFamily="Segoe UI"
+        Closing="Window_Closing"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Window.CommandBindings>
+        <CommandBinding Command="ApplicationCommands.Close" Executed="Quit_Executed" />
+        <CommandBinding Command="{x:Static local:MainWindow.BackToMenuCommand}" Executed="BackToMenu_Click" />
+    </Window.CommandBindings>
+
+    <Window.InputBindings>
+        <KeyBinding Key="Q" Modifiers="Control" Command="ApplicationCommands.Close" />
+        <KeyBinding Key="Escape" Command="{x:Static local:MainWindow.BackToMenuCommand}" />
+    </Window.InputBindings>
+
+    <Window.Resources>
+        <Style x:Key="StringButton" TargetType="Button">
+            <Setter Property="Width" Value="64" />
+            <Setter Property="Height" Value="64" />
+            <Setter Property="Margin" Value="6,0" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C3140" />
+            <Setter Property="BorderBrush" Value="#2C3140" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="32"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#5B8CFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SmallButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C3140" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="6" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#3A4155" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TabStringChoice" TargetType="Button">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinWidth" Value="44" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C3140" />
+            <Setter Property="BorderBrush" Value="#2C3140" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter Margin="9,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MenuButton" TargetType="Button">
+            <Setter Property="Width" Value="260" />
+            <Setter Property="Height" Value="56" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#2C3140" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="12" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Start menu -->
+        <StackPanel x:Name="StartMenu" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="🎸" FontSize="64" HorizontalAlignment="Center" FontFamily="Segoe UI Emoji" />
+            <TextBlock Text="Guitar Tuner" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,8,0,0" />
+            <TextBlock Text="Choose an option" FontSize="15" Foreground="#9AA0B4" HorizontalAlignment="Center"
+                       Margin="0,4,0,40" />
+            <Button Content="Tuning" Style="{StaticResource MenuButton}" Background="#5B8CFF" Click="StartTuning_Click" />
+            <Button Content="Chords" Style="{StaticResource MenuButton}" Background="#14B8A6" Margin="0,14,0,0"
+                    Click="StartChords_Click" />
+            <Button Content="Tabs" Style="{StaticResource MenuButton}" Background="#F59E0B" Margin="0,14,0,0"
+                    Click="StartTabs_Click" />
+            <Button Content="Songs" Style="{StaticResource MenuButton}" Background="#3D7BFF" Margin="0,14,0,0"
+                    Click="StartSongs_Click" ToolTip="Transcribe an audio file into tablature" />
+            <Button Content="Metronome" Style="{StaticResource MenuButton}" Background="#8B5CF6" Margin="0,14,0,0"
+                    Click="StartMetronome_Click" />
+            <Button Content="Quit" Style="{StaticResource MenuButton}" Margin="0,14,0,0"
+                    Command="ApplicationCommands.Close" />
+        </StackPanel>
+
+        <!-- Tuner -->
+        <DockPanel x:Name="TunerView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Settings -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TuningBox" Grid.Row="0" Grid.Column="1" Height="28"
+                              DisplayMemberPath="DisplayName" SelectionChanged="TuningBox_SelectionChanged" />
+
+                    <TextBlock Grid.Row="1" Text="Microphone" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="DeviceBox" Grid.Row="1" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="DeviceBox_SelectionChanged" />
+
+                    <TextBlock Grid.Row="2" Text="Reference" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" LastChildFill="False">
+                        <Button Content="−" Style="{StaticResource SmallButton}" Click="A4Down_Click" />
+                        <TextBlock x:Name="A4Text" Text="A4 = 440 Hz" Width="100" TextAlignment="Center"
+                                   VerticalAlignment="Center" FontWeight="SemiBold" />
+                        <Button Content="+" Style="{StaticResource SmallButton}" Click="A4Up_Click" />
+                        <CheckBox x:Name="AutoBox" DockPanel.Dock="Right" Content="Auto-detect string" IsChecked="True"
+                                  Foreground="#E6E8EF" VerticalAlignment="Center"
+                                  Checked="AutoBox_Changed" Unchecked="AutoBox_Changed" />
+                    </DockPanel>
+
+                    <TextBlock Grid.Row="3" Text="Sensitivity" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <DockPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="Ignore noise" FontSize="11" Foreground="#6C7389"
+                                   VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock DockPanel.Dock="Right" Text="Pick up quiet" FontSize="11" Foreground="#6C7389"
+                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                        <Slider x:Name="SensitivitySlider" Minimum="0" Maximum="1" Value="0.5" VerticalAlignment="Center"
+                                ToolTip="Lower this if background noise is being detected"
+                                ValueChanged="SensitivitySlider_ValueChanged" />
+                    </DockPanel>
+                </Grid>
+
+                <!-- Gauge -->
+                <Canvas x:Name="GaugeCanvas" Grid.Row="1" Width="320" Height="180" Margin="0,24,0,0">
+                    <Line x:Name="Needle" X1="160" Y1="170" X2="160" Y2="40"
+                          Stroke="#E6E8EF" StrokeThickness="3" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                        <Line.RenderTransform>
+                            <RotateTransform x:Name="NeedleRotate" CenterX="160" CenterY="170" />
+                        </Line.RenderTransform>
+                    </Line>
+                    <Ellipse Canvas.Left="152" Canvas.Top="162" Width="16" Height="16" Fill="#E6E8EF" />
+                </Canvas>
+
+                <!-- Readout -->
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <TextBlock x:Name="NoteText" Text="–" FontSize="72" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="HintText" Text="Play a string" FontSize="20" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="#9AA0B4" />
+                    <TextBlock x:Name="CentsText" Text=" " FontSize="15" HorizontalAlignment="Center"
+                               Foreground="#9AA0B4" Margin="0,6,0,0" />
+                    <TextBlock x:Name="FrequencyText" Text=" " FontSize="13" HorizontalAlignment="Center"
+                               Foreground="#6C7389" Margin="0,2,0,0" />
+                </StackPanel>
+
+                <!-- Strings -->
+                <StackPanel x:Name="StringsPanel" Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" />
+
+                <!-- Input level -->
+                <DockPanel Grid.Row="5" Margin="0,20,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="LevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, blue = loud enough to be analysed" />
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- Chord recognition -->
+        <DockPanel x:Name="ChordView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0">
+                    <TextBlock Text="Microphone" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="ChordDeviceBox" Height="28" SelectionChanged="ChordDeviceBox_SelectionChanged" />
+                </DockPanel>
+
+                <Grid Grid.Row="1" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <!-- Shrinks long names like C#maj7/G# to fit next to the diagram -->
+                        <Viewbox MaxWidth="290" Height="130" StretchDirection="DownOnly">
+                            <TextBlock x:Name="ChordNameText" Text="–" FontSize="110" FontWeight="Bold" />
+                        </Viewbox>
+                        <TextBlock x:Name="ChordFullNameText" Text="Strum a chord" FontSize="20" FontWeight="SemiBold"
+                                   Foreground="#9AA0B4" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
+                        <TextBlock x:Name="ChordNotesText" Text=" " FontSize="16" Foreground="#9AA0B4"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
+                        <TextBlock x:Name="ChordMatchText" Text=" " FontSize="13" Foreground="#6C7389"
+                                   HorizontalAlignment="Center" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <controls:ChordDiagram x:Name="ChordDiagramView" Grid.Column="1" Width="180" Height="230"
+                                           Margin="12,0,0,0" DotBrush="#14B8A6" Visibility="Hidden"
+                                           ToolTip="How to play this chord: numbers are fingers (1 = index), ○ = open, × = don't play" />
+                </Grid>
+
+                <!-- Energy per note (chromagram); bars are created in code -->
+                <Grid x:Name="ChromaGrid" Grid.Row="2" Height="150" Margin="0,8,0,0"
+                      ToolTip="How strongly each note is heard. Notes of the detected chord are highlighted." />
+
+                <DockPanel Grid.Row="3" Margin="0,18,0,0">
+                    <TextBlock Text="Recent" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <StackPanel x:Name="RecentChordsPanel" Orientation="Horizontal" Height="30" />
+                </DockPanel>
+
+                <DockPanel Grid.Row="4" Margin="0,18,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="ChordLevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, teal = loud enough to be analysed" />
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- Tabs: every played note written as tablature -->
+        <DockPanel x:Name="TabView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabTuningBox" Grid.Column="1" Height="28" DisplayMemberPath="DisplayName"
+                              SelectionChanged="TabTuningBox_SelectionChanged" />
+                    <TextBlock Grid.Row="1" Text="Microphone" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabDeviceBox" Grid.Row="1" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="TabDeviceBox_SelectionChanged" />
+                    <TextBlock Grid.Row="2" Text="Play on" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabStringBox" Grid.Row="2" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="TabStringBox_SelectionChanged"
+                              ToolTip="Auto guesses the string. Pick one to force every note onto that string. Shortcut: 6–1 on the keyboard." />
+                    <WrapPanel x:Name="TabStringButtonsPanel" Grid.Row="3" Grid.Column="1" Margin="0,8,0,0" />
+                    <TextBlock Grid.Row="4" Grid.Column="1"
+                               Text="Pick the string you play so the fret is exact. Keys 6–1, 0 = Auto."
+                               FontSize="11" Foreground="#6C7389" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="5" Text="Detector" VerticalAlignment="Center" Margin="0,8,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="TabEngineBox" Grid.Row="5" Grid.Column="1" Height="28" Margin="0,8,0,0"
+                              SelectionChanged="TabEngineBox_SelectionChanged"
+                              ToolTip="AI uses the Basic Pitch neural network: it hears chords and notes over ringing strings. Classic is the older one-note-at-a-time detector." />
+                </Grid>
+
+                <!-- Current note -->
+                <Border Grid.Row="1" Background="#232733" CornerRadius="12" Padding="18,12" Margin="0,16,0,0">
+                    <DockPanel>
+                        <TextBlock x:Name="TabNoteText" Text="–" FontSize="56" FontWeight="Bold" MinWidth="130" MaxWidth="240" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                            <TextBlock x:Name="TabStringText" Text="Play one note at a time" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TabFretText" Text="Mute the previous string before the next note" FontSize="15"
+                                       Foreground="#9AA0B4" Margin="0,2,0,0" />
+                            <TextBlock x:Name="TabAlternativesText" Text=" " FontSize="12" Foreground="#6C7389"
+                                       Margin="0,6,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <DockPanel Grid.Row="2" Margin="0,14,0,8" LastChildFill="False">
+                    <TextBlock Text="Click a string at a note, type the fret · Del removes · Save teaches the app your fingering"
+                               Foreground="#6C7389" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300" />
+                    <Button DockPanel.Dock="Right" Content="Train" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="StartTraining_Click"
+                            ToolTip="Play short tab phrases so the app learns how each string of your guitar sounds" />
+                    <Button DockPanel.Dock="Right" Content="Guided test" Style="{StaticResource SmallButton}" Width="94"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="StartTabTest_Click"
+                            ToolTip="The app names notes one by one and records you playing them" />
+                    <Button DockPanel.Dock="Right" Content="Save tab" Style="{StaticResource SmallButton}" Width="80"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="SaveTab_Click"
+                            ToolTip="Save this tab as correct. The app remembers your fingering and uses it when you play this again" />
+                    <Button DockPanel.Dock="Right" Content="Copy tab" Style="{StaticResource SmallButton}" Width="86"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="CopyTab_Click"
+                            ToolTip="Copy the tab as text, ready to paste anywhere" />
+                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="ClearTab_Click" />
+                    <Button DockPanel.Dock="Right" Content="Undo" Style="{StaticResource SmallButton}" Width="64"
+                            Height="30" FontSize="13" Click="UndoTab_Click" ToolTip="Remove the last note" />
+                </DockPanel>
+
+                <Border Grid.Row="3" Background="#1B1E27" CornerRadius="10" Padding="4,6">
+                    <ScrollViewer x:Name="TabScroll" VerticalScrollBarVisibility="Auto">
+                        <controls:TabStaff x:Name="TabStaffView" HighlightBrush="#F59E0B" />
+                    </ScrollViewer>
+                </Border>
+
+                <DockPanel Grid.Row="4" Margin="0,14,0,0">
+                    <TextBlock Text="Input" Foreground="#6C7389" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <ProgressBar x:Name="TabLevelBar" Height="6" Maximum="1" Background="#232733" Foreground="#4A5066"
+                                 BorderThickness="0"
+                                 ToolTip="Grey = treated as background noise, amber = loud enough to be analysed" />
+                </DockPanel>
+
+                <!-- Training overlay: shows a tab phrase, labels each note heard, learns the string sounds -->
+                <Border x:Name="TrainPanel" Grid.RowSpan="5" Panel.ZIndex="11" Background="#E615171E"
+                        Visibility="Collapsed">
+                    <Border Background="#232733" CornerRadius="18" Padding="30,26" Width="520"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#3A4050" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock x:Name="TrainTitle" Text="STRING TRAINING" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="#F59E0B" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TrainPhraseText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <TextBlock x:Name="TrainNoteText" Text="…" FontSize="64" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Margin="0,2,0,0" />
+                            <TextBlock x:Name="TrainInstructionText" Text="Get ready" FontSize="20"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <Border Background="#1B1E27" CornerRadius="10" Padding="4,4" Margin="0,12,0,0">
+                                <controls:TabStaff x:Name="TrainStaff" Height="150" IsHitTestVisible="False"
+                                                   HighlightBrush="#F59E0B" />
+                            </Border>
+                            <TextBlock x:Name="TrainProgressText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <TextBlock x:Name="TrainStatusText" Text="" FontSize="12" Foreground="#6C7389"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Margin="0,10,0,0" />
+                            <TextBlock x:Name="TrainHintText" FontSize="12" Foreground="#6C7389" HorizontalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Text="Play the highlighted note exactly where the tab shows it, let it sound for a moment, then mute it. The next note lights up when the app has heard it." />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+                                <Button x:Name="TrainSkipButton" Content="Skip phrase" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="SkipTrainingPhrase_Click" ToolTip="Go to the next phrase; notes already heard are kept" />
+                                <Button x:Name="TrainFinishButton" Content="Finish" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="FinishTraining_Click" ToolTip="Stop and learn from everything played so far" />
+                                <Button x:Name="TrainFolderButton" Content="Open folder" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13"
+                                        Click="OpenTrainingFolder_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Border>
+
+                <!-- Guided test overlay: names each note and records the take -->
+                <Border x:Name="TabTestPanel" Grid.RowSpan="5" Panel.ZIndex="10" Background="#E615171E"
+                        Visibility="Collapsed">
+                    <Border Background="#232733" CornerRadius="18" Padding="30,26" Width="450"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            BorderBrush="#3A4050" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock x:Name="TabTestTitle" Text="GUIDED TEST" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="#F59E0B" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="TabTestNoteText" Text="…" FontSize="76" FontWeight="Bold"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            <TextBlock x:Name="TabTestInstructionText" Text="Get ready" FontSize="21"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <Border Background="#1B1E27" CornerRadius="10" Padding="4,4" Margin="0,12,0,0">
+                                <controls:TabStaff x:Name="TabTestStaff" Height="150" IsHitTestVisible="False"
+                                                   HighlightBrush="#F59E0B" />
+                            </Border>
+                            <TextBlock x:Name="TabTestProgressText" Text="" FontSize="15" Foreground="#9AA0B4"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <TextBlock x:Name="TabTestStatusText" Text="Recording…" FontSize="12" Foreground="#6C7389"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Margin="0,12,0,0" />
+                            <TextBlock Text="The note stays until you click Next. Mute each string before the next one."
+                                       FontSize="12" Foreground="#6C7389" HorizontalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,18,0,0">
+                                <Button x:Name="TabTestNextButton" Content="Next" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Click="NextTabTest_Click" ToolTip="Record this note and show the next one" />
+                                <Button x:Name="TabTestFolderButton" Content="Open folder" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Margin="0,0,8,0"
+                                        Visibility="Collapsed" Click="OpenTabTestFolder_Click" />
+                                <Button x:Name="TabTestCancelButton" Content="Cancel" Style="{StaticResource SmallButton}"
+                                        Width="104" Height="32" FontSize="13" Click="CancelTabTest_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Border>
+            </Grid>
+        </DockPanel>
+
+        <!-- Songs: transcribe an audio file, then arrange notes on the neck -->
+        <DockPanel x:Name="SongView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <Grid Margin="24,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="SongFileText" Height="30" IsReadOnly="True" VerticalContentAlignment="Center"
+                             Background="#1B1E27" Foreground="#9AA0B4" BorderBrush="#3A4050"
+                             ToolTip="An audio file with a guitar part" />
+                    <Button x:Name="SongBrowseButton" Grid.Column="1" Content="Browse…" Style="{StaticResource SmallButton}" Width="82"
+                            Height="30" FontSize="13" Margin="8,0,0,0" Click="BrowseSong_Click" />
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Tuning" VerticalAlignment="Center" Margin="0,0,12,0" Foreground="#9AA0B4" />
+                    <ComboBox x:Name="SongTuningBox" Grid.Column="1" Height="28" DisplayMemberPath="DisplayName"
+                              HorizontalAlignment="Left" Width="200" />
+                    <CheckBox x:Name="SongSoloBox" Grid.Column="2" Content="Solo" Foreground="#E6E8EF"
+                              VerticalAlignment="Center" Margin="8,0,0,0"
+                              ToolTip="Keep only the strongest note at each onset instead of building chords"
+                              Checked="SongSoloBox_Changed" Unchecked="SongSoloBox_Changed" />
+                    <Button x:Name="SongTranscribeButton" Grid.Column="3" Content="Transcribe"
+                            Style="{StaticResource SmallButton}" Width="94" Height="30" FontSize="13"
+                            Margin="8,0,0,0" Click="TranscribeSong_Click"
+                            ToolTip="Run Basic Pitch on the selected audio file" />
+                    <Button x:Name="SongCancelButton" Grid.Column="4" Content="Cancel"
+                            Style="{StaticResource SmallButton}" Width="72" Height="30" FontSize="13"
+                            Margin="8,0,0,0" Visibility="Collapsed" Click="CancelSong_Click" />
+                </Grid>
+
+                <StackPanel Grid.Row="2" Margin="0,10,0,8">
+                    <DockPanel LastChildFill="True">
+                        <ProgressBar x:Name="SongProgressBar" DockPanel.Dock="Right" Width="118" Height="6"
+                                     IsIndeterminate="True" Visibility="Collapsed" Background="#232733"
+                                     Foreground="#3D7BFF" BorderThickness="0" VerticalAlignment="Center"
+                                     Margin="10,0,0,0" />
+                        <TextBlock x:Name="SongStatusText" Text="Choose an audio file to begin."
+                                   FontSize="13" Foreground="#9AA0B4" TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+                    <TextBlock x:Name="SongInfoText" Text=" " FontSize="11" Foreground="#6C7389"
+                               Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border Grid.Row="3" Background="#1B1E27" CornerRadius="10" Padding="4,6">
+                    <ScrollViewer x:Name="SongScroll" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <controls:SongTabStaff x:Name="SongStaffView"
+                                               ToolTip="Click a note to move it to the next string. Right-click to remove it." />
+                    </ScrollViewer>
+                </Border>
+
+                <DockPanel Grid.Row="4" Margin="0,12,0,0" LastChildFill="False">
+                    <TextBlock x:Name="SongHintText"
+                               Text="Python with basic-pitch is required. Run tools\setup-transcription.ps1 once."
+                               Foreground="#6C7389" FontSize="11" VerticalAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="138" />
+                    <Button DockPanel.Dock="Right" Content="MusicXML" Style="{StaticResource SmallButton}"
+                            Width="84" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ExportSongMusicXml_Click" />
+                    <Button DockPanel.Dock="Right" Content="MIDI" Style="{StaticResource SmallButton}"
+                            Width="64" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ExportSongMidi_Click" />
+                    <Button DockPanel.Dock="Right" Content="Copy tab" Style="{StaticResource SmallButton}"
+                            Width="76" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="CopySongTab_Click" />
+                    <Button DockPanel.Dock="Right" Content="Clear" Style="{StaticResource SmallButton}"
+                            Width="58" Height="30" FontSize="13" Margin="8,0,0,0"
+                            Click="ClearSong_Click" />
+                </DockPanel>
+            </Grid>
+        </DockPanel>
+
+        <!-- Metronome -->
+        <DockPanel x:Name="MetronomeView" Visibility="Collapsed">
+            <Border DockPanel.Dock="Top" Background="#232733" Padding="12,6">
+                <Button Content="← Menu" Style="{StaticResource SmallButton}" Width="80" FontSize="13"
+                        HorizontalAlignment="Left" Click="BackToMenu_Click" ToolTip="Back to the start menu (Esc)" />
+            </Border>
+
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
+                <TextBlock x:Name="TempoNameText" Text="Allegro" FontSize="18" Foreground="#9AA0B4"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="BpmText" Text="120" FontSize="110" FontWeight="Bold" HorizontalAlignment="Center"
+                           Margin="0,-6,0,-12" />
+                <TextBlock Text="BPM" FontSize="16" Foreground="#6C7389" HorizontalAlignment="Center" />
+
+                <DockPanel Margin="0,24,0,0">
+                    <Button DockPanel.Dock="Left" Content="−" Style="{StaticResource SmallButton}" Width="40" Height="40"
+                            FontSize="22" Click="BpmDown_Click" />
+                    <Button DockPanel.Dock="Right" Content="+" Style="{StaticResource SmallButton}" Width="40" Height="40"
+                            FontSize="22" Click="BpmUp_Click" />
+                    <Slider x:Name="BpmSlider" Minimum="30" Maximum="250" Value="120" Margin="12,0"
+                            VerticalAlignment="Center" IsSnapToTickEnabled="True" TickFrequency="1"
+                            ValueChanged="BpmSlider_ValueChanged" />
+                </DockPanel>
+
+                <StackPanel x:Name="BeatsPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,36,0,0" />
+
+                <Grid Margin="0,36,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Time signature" Foreground="#9AA0B4" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <ComboBox x:Name="TimeSignatureBox" Grid.Column="1" Width="80" Height="28" HorizontalAlignment="Left"
+                              DisplayMemberPath="Name" SelectionChanged="TimeSignatureBox_SelectionChanged" />
+                    <Button Grid.Column="2" Content="Tap tempo" Style="{StaticResource SmallButton}" Width="110"
+                            Height="34" FontSize="14" Click="TapTempo_Click"
+                            ToolTip="Tap in time with the music to set the tempo" />
+                </Grid>
+
+                <Button x:Name="StartStopButton" Content="Start" Style="{StaticResource MenuButton}" Background="#8B5CF6"
+                        Margin="0,36,0,0" Click="StartStop_Click" />
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

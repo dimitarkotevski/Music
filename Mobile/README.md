@@ -9,7 +9,7 @@ wrapped as native apps with [Capacitor](https://capacitorjs.com/).
   returns to it and stops the tuner or metronome. Exit closes the app on Android; iOS and browsers don't let an app
   close itself, so there it stops everything and shows a goodbye screen.
 - **Tuner**: the same YIN pitch detection, smoothing and auto string detection as the desktop tuner
-  ([`pitch-detector.js`](www/js/pitch-detector.js) is a port of `Music/Audio/PitchDetector.cs`).
+  ([`pitch-detector.js`](www/js/pitch-detector.js) is a port of `AllTunning/Audio/PitchDetector.cs`).
   Tap a string to lock onto it and hear its reference tone; A4 reference 415–466 Hz; sensitivity slider.
 - **Suggested tunings**: Standard, Drop D/C/B/A, step-down, open tunings, DADGAD, 7-string, bass and ukulele.
 - **Custom tunings**: tap **+ Custom** to start from the current tuning, then set every string (1–12 strings,
