@@ -22,6 +22,9 @@ const NEEDLE_TIME_CONSTANT_SECONDS = 0.06;
 // In auto mode a note keeps its string unless another string is heard for this many readings in a row.
 const STRING_SWITCH_READINGS = 10;
 
+// The last entry in the tuning list; picking it opens the editor instead of selecting a tuning.
+const CUSTOM_OPTION = 'new-custom';
+
 const $ = id => document.getElementById(id);
 
 let customTunings = load('customTunings', []);
@@ -53,7 +56,15 @@ export function initTuner() {
   buildStringButtons();
   showIdle();
 
-  $('tuning-select').addEventListener('change', e => selectTuning(findTuning(e.target.value)));
+  $('tuning-select').addEventListener('change', e => {
+    if (e.target.value !== CUSTOM_OPTION) {
+      selectTuning(findTuning(e.target.value));
+      return;
+    }
+    // Keep showing the current tuning; saving the new one selects it.
+    e.target.value = tuning.id;
+    openTuningEditor({ base: tuning, isNew: true, a4, onSave: saveCustomTuning });
+  });
   $('a4-down').addEventListener('click', () => setA4(a4 - 1));
   $('a4-up').addEventListener('click', () => setA4(a4 + 1));
   $('auto-button').addEventListener('click', () => {
@@ -111,6 +122,7 @@ function fillTuningSelect() {
   };
   group('My tunings', customTunings);
   group('Suggested', SUGGESTED_TUNINGS);
+  select.append(new Option('Custom… (make your own)', CUSTOM_OPTION));
   select.value = tuning.id;
   $('edit-tuning').hidden = !tuning.custom;
 }

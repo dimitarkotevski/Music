@@ -12,7 +12,7 @@ wrapped as native apps with [Capacitor](https://capacitorjs.com/).
   ([`pitch-detector.js`](www/js/pitch-detector.js) is a port of `AllTunning/Audio/PitchDetector.cs`).
   Tap a string to lock onto it and hear its reference tone; A4 reference 415–466 Hz; sensitivity slider.
 - **Suggested tunings**: Standard, Drop D/C/B/A, step-down, open tunings, DADGAD, 7-string, bass and ukulele.
-- **Custom tunings**: tap **+ Custom** to start from the current tuning, then set every string (1–12 strings,
+- **Custom tunings**: pick **Custom…** at the bottom of the tuning list (or tap **+ Custom**) to start from the current tuning, then set every string (1–12 strings,
   A0 to C6) with − / +, or shift all strings at once. Saved tunings appear under *My tunings*; **Edit** changes
   or deletes them. They are stored on the phone.
 - **Metronome**: 30–250 BPM, hold − / + to repeat, tap tempo, 2/4 to 7/8 with an accented first beat. Clicks are
